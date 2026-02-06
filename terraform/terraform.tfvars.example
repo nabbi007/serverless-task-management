@@ -1,0 +1,36 @@
+# AWS Configuration
+aws_region  = "eu-west-1"
+environment = "dev"
+project_name = "task-management"
+
+# Email Domain Restrictions
+allowed_email_domains = [
+  "amalitech.com",
+  "amalitechtraining.org"
+]
+
+# Cognito Callback URLs
+cognito_callback_urls = [
+  "http://localhost:3000/callback",
+  "https://your-amplify-domain.amplifyapp.com/callback"
+]
+
+cognito_logout_urls = [
+  "http://localhost:3000/",
+  "https://your-amplify-domain.amplifyapp.com/"
+]
+
+# GitHub Configuration (Optional - for Amplify deployment via webhook)
+# Set enable_amplify = true to deploy frontend to Amplify
+enable_amplify    = true
+github_repository = "https://github.com/nabbi007/serverless-task-management"
+github_branch     = "main"
+
+# Performance Optimization (Recommended for production)
+# API Gateway caching reduces Lambda invocations by ~80% for read operations
+# Cost: ~$0.02/hour (~$14.40/month) but saves on Lambda/DynamoDB costs
+enable_api_caching = false  # Set to true for production
+
+# Monitoring Configuration (Optional)
+# Provide email to receive CloudWatch alarms for errors, throttles, and high latency
+alert_email = ""  # e.g., "admin@amalitech.com"
