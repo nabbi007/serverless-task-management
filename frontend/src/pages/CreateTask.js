@@ -22,7 +22,11 @@ const CreateTask = () => {
       navigate(`/tasks/${response.data.taskId}`);
     } catch (error) {
       console.error('Error creating task:', error);
-      alert('Failed to create task. Please try again.');
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create task. Please try again.';
+      alert(`Error: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
