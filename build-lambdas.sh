@@ -26,10 +26,21 @@ cd terraform/modules/cognito/lambda
 zip -q pre-signup.zip pre-signup.js
 cd ../../../..
 
+# Create lambda-packages directory if it doesn't exist
 echo ""
-echo "✓ All Lambda packages built successfully!"
+echo "5. Copying packages to terraform/lambda-packages..."
+mkdir -p terraform/lambda-packages
+
+# Copy all Lambda function packages
+cp backend/dist/*.zip terraform/lambda-packages/
+
+# Copy pre-signup Lambda
+cp terraform/modules/cognito/lambda/pre-signup.zip terraform/lambda-packages/
+
+echo ""
+echo "✓ All Lambda packages built and copied successfully!"
 echo ""
 echo "Package sizes:"
-ls -lh backend/dist/*.zip
+ls -lh terraform/lambda-packages/*.zip
 echo ""
 echo "You can now run: cd terraform && terraform apply"
