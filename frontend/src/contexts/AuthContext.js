@@ -27,7 +27,7 @@ export const AuthProvider = ({ children, user }) => {
           const groups = token.payload['cognito:groups'] || [];
           const customRole = token.payload['custom:role'];
           
-          if (groups.includes('admin') || customRole === 'admin') {
+          if (groups.includes('Admins') || groups.includes('admin') || customRole === 'admin') {
             setUserRole('admin');
           } else {
             setUserRole('member');

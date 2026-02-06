@@ -20,7 +20,7 @@ Amplify.configure({
     REST: {
       TaskManagementAPI: {
         endpoint: process.env.REACT_APP_API_ENDPOINT,
-        region: process.env.REACT_APP_REGION
+        region: process.env.REACT_APP_AWS_REGION
       }
     }
   }
