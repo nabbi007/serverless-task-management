@@ -8,7 +8,9 @@ const CreateTask = () => {
     title: '',
     description: '',
     priority: 'medium',
-    dueDate: ''
+    dueDate: '',
+    timeEstimate: '',
+    assignedTo: ''
   });
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +21,8 @@ const CreateTask = () => {
     try {
       const response = await taskAPI.createTask(formData);
       alert('Task created successfully!');
-      navigate(`/tasks/${response.data.taskId}`);
+      const taskId = response.data?.data?.taskId || response.data?.taskId;
+      navigate(`/tasks/${taskId}`);
     } catch (error) {
       console.error('Error creating task:', error);
       console.error('Error response:', error.response?.data);
@@ -94,6 +97,34 @@ const CreateTask = () => {
               name="dueDate"
               value={formData.dueDate}
               onChange={handleChange}
+            />
+          </div>
+        </div>
+
+        <div className="form-row">
+          <div className="form-group">
+            <label htmlFor="assignedTo">Assigned To</label>
+            <input
+              type="text"
+              id="assignedTo"
+              name="assignedTo"
+              value={formData.assignedTo}
+              onChange={handleChange}
+              placeholder="Enter assignee name"
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="timeEstimate">Time Estimate (hours)</label>
+            <input
+              type="number"
+              id="timeEstimate"
+              name="timeEstimate"
+              value={formData.timeEstimate}
+              onChange={handleChange}
+              placeholder="e.g., 2.5"
+              step="0.5"
+              min="0"
             />
           </div>
         </div>

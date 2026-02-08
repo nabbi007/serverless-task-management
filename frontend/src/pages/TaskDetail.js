@@ -19,8 +19,9 @@ const TaskDetail = () => {
   const loadTask = async () => {
     try {
       const response = await taskAPI.getTask(id);
-      setTask(response.data);
-      setFormData(response.data);
+      const taskData = response.data?.data || response.data;
+      setTask(taskData);
+      setFormData(taskData);
     } catch (error) {
       console.error('Error loading task:', error);
       alert('Failed to load task');

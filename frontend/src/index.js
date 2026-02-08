@@ -16,19 +16,25 @@ const requiredEnvVars = {
 console.log('Environment Variables:', requiredEnvVars);
 
 const missingVars = Object.entries(requiredEnvVars)
-  .filter(([key, value]) => !value)
+  .filter(([key, value]) => !value || value.trim() === '')
   .map(([key]) => key);
 
 if (missingVars.length > 0) {
-  console.error('Missing required environment variables:', missingVars);
+  console.error('Missing or empty required environment variables:', missingVars);
   const root = ReactDOM.createRoot(document.getElementById('root'));
   root.render(
     <div style={{ padding: '40px', textAlign: 'center', backgroundColor: '#fff3cd', minHeight: '100vh' }}>
       <h1>⚠️ Configuration Error</h1>
       <p style={{ fontSize: '18px', color: '#856404' }}>
-        Missing environment variables: <strong>{missingVars.join(', ')}</strong>
+        Missing or empty environment variables: <strong>{missingVars.join(', ')}</strong>
       </p>
       <p>Please check the Amplify Console environment variables configuration.</p>
+      <details style={{ marginTop: '20px', textAlign: 'left', maxWidth: '600px', margin: '20px auto' }}>
+        <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>View all environment variables</summary>
+        <pre style={{ backgroundColor: '#fff', padding: '10px', borderRadius: '5px', marginTop: '10px' }}>
+          {JSON.stringify(requiredEnvVars, null, 2)}
+        </pre>
+      </details>
     </div>
   );
 } else {
