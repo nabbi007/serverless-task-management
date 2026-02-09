@@ -181,7 +181,7 @@ body {
 }
 
 .sidebar-icon {
-  font-size: 18px;
+  color: inherit;
 }
 
 .sidebar-label {
@@ -192,9 +192,24 @@ body {
 .sidebar-footer {
   padding: 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-user-btn {
+  width: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 10px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.sidebar-user-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-user {
@@ -237,19 +252,10 @@ body {
   text-transform: capitalize;
 }
 
-.signout-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: none;
-  color: white;
-  padding: 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 16px;
-  transition: all 0.2s;
-}
-
-.signout-btn:hover {
-  background: #e74c3c;
+.signout-icon-inline {
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0.7;
 }
 
 /* ========================================
@@ -907,7 +913,7 @@ body {
   }
 
   .user-details,
-  .signout-btn {
+  .signout-icon-inline {
     display: none;
   }
 
@@ -927,4 +933,114 @@ body {
   .form-row {
     grid-template-columns: 1fr;
   }
+}
+
+/* ========================================
+   TEAM PAGE
+   ======================================== */
+
+.team-page {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.members-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 24px;
+  margin-top: 30px;
+}
+
+.member-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid #e8ecef;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  transition: all 0.2s;
+}
+
+.member-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.member-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00bcd4 0%, #0097a7 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.member-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.member-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-meta {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.role-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.role-badge.role-admin {
+  background: #ffe5e5;
+  color: #e74c3c;
+}
+
+.role-badge.role-member {
+  background: #e8f4f8;
+  color: #3498db;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.status-confirmed {
+  background: #e8f5e9;
+  color: #4caf50;
+}
+
+.status-badge.status-unconfirmed {
+  background: #fff3e0;
+  color: #ff9800;
+}
+
+.verified-badge {
+  font-size: 12px;
+  color: #27ae60;
+  font-weight: 500;
 }

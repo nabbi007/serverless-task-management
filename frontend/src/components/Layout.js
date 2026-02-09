@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { LayoutDashboard, ListTodo, Users, LogOut, Bell } from 'lucide-react';
 
 const Layout = ({ children, signOut, user }) => {
   const { userRole, isAdmin } = useAuth();
@@ -22,16 +23,16 @@ const Layout = ({ children, signOut, user }) => {
       <header className="top-header">
         <div className="header-left">
           <div className="app-logo">
-            <div className="logo-icon">A</div>
+            <div className="logo-icon">D</div>
             <div className="logo-text">
-              <div className="logo-title">AmaliTech</div>
-              <div className="logo-subtitle">Task Management</div>
+              <div className="logo-title">DevOps</div>
+              <div className="logo-subtitle">Task Management System</div>
             </div>
           </div>
         </div>
         <div className="header-right">
           <button className="notification-btn">
-            <span className="notification-icon">🔔</span>
+            <Bell size={20} />
             <span className="notification-badge">1</span>
           </button>
           <div className="user-menu">
@@ -48,36 +49,35 @@ const Layout = ({ children, signOut, user }) => {
               to="/" 
               className={`sidebar-item ${isActive('/') ? 'active' : ''}`}
             >
-              <span className="sidebar-icon">📊</span>
+              <LayoutDashboard className="sidebar-icon" size={18} />
               <span className="sidebar-label">Dashboard</span>
             </Link>
             <Link 
               to="/tasks" 
               className={`sidebar-item ${isActive('/tasks') || location.pathname.startsWith('/tasks') ? 'active' : ''}`}
             >
-              <span className="sidebar-icon">📝</span>
+              <ListTodo className="sidebar-icon" size={18} />
               <span className="sidebar-label">Tasks</span>
             </Link>
-            <div className="sidebar-item disabled">
-              <span className="sidebar-icon">👥</span>
-              <span className="sidebar-label">Team</span>
-            </div>
-            <div className="sidebar-item disabled">
-              <span className="sidebar-icon">⚙️</span>
-              <span className="sidebar-label">Settings</span>
-            </div>
+            {isAdmin() && (
+              <Link 
+                to="/team" 
+                className={`sidebar-item ${isActive('/team') ? 'active' : ''}`}
+              >
+                <Users className="sidebar-icon" size={18} />
+                <span className="sidebar-label">Team</span>
+              </Link>
+            )}
           </nav>
 
           <div className="sidebar-footer">
-            <div className="sidebar-user">
+            <button onClick={signOut} className="sidebar-user-btn">
               <div className="user-avatar-small">{getInitials(user?.signInDetails?.loginId)}</div>
               <div className="user-details">
                 <div className="user-email">{user?.signInDetails?.loginId}</div>
                 <div className="user-role">{userRole}</div>
               </div>
-            </div>
-            <button onClick={signOut} className="signout-btn" title="Sign Out">
-              🚪
+              <LogOut size={16} className="signout-icon-inline" />
             </button>
           </div>
         </aside>
