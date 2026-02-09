@@ -22,12 +22,15 @@ const CreateTask = () => {
 
   const loadUsers = async () => {
     try {
+      console.log('Fetching users for assignment...');
       const response = await taskAPI.getUsers();
-      console.log('Users loaded:', response);
-      setUsers(response.data?.users || []);
+      console.log('getUsers response:', response);
+      
+      const userList = response.data?.users || [];
+      setUsers(userList);
     } catch (error) {
       console.error('Error loading users:', error);
-      // Don't show error to user, just log it
+      // Don't block form submission if users can't be loaded
       setUsers([]);
     } finally {
       setLoadingUsers(false);
