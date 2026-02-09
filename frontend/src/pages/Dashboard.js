@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { taskAPI } from '../services/api';
+import SuccessModal from '../components/SuccessModal';
 
 const Dashboard = () => {
   const { isAdmin } = useAuth();
@@ -14,9 +15,72 @@ const Dashboard = () => {
     inProgress: 0,
     completed: 0
   });
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  const getDeletedTaskIds = () => {
+    try {
+      const raw = sessionStorage.getItem('deletedTaskIds');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.error('Error reading deleted task IDs:', error);
+      return [];
+    }
+  };
+
+  const computeStats = (taskList) => ({
+    total: taskList.length,
+    open: taskList.filter(t => t.status === 'open').length,
+    inProgress: taskList.filter(t => t.status === 'in-progress').length,
+    completed: taskList.filter(t => t.status === 'completed').length
+  });
+
+  const applyTasks = (taskList) => {
+    setTasks(taskList);
+    setStats(computeStats(taskList));
+  };
 
   useEffect(() => {
     loadTasks();
+    
+    // Check if task was just created
+    const taskCreated = sessionStorage.getItem('taskCreatedSuccess');
+    if (taskCreated === 'true') {
+      setShowSuccessModal(true);
+      sessionStorage.removeItem('taskCreatedSuccess');
+    }
+    
+    // Check if task was just deleted - reload tasks
+    const taskDeleted = sessionStorage.getItem('taskDeletedSuccess');
+    if (taskDeleted === 'true') {
+      sessionStorage.removeItem('taskDeletedSuccess');
+      // Reload tasks to remove deleted task from display
+      setTimeout(() => loadTasks(), 100);
+    }
+    
+    // Listen for task updates
+    const handleTaskUpdate = () => {
+      console.log('Dashboard: Task updated, reloading...');
+      loadTasks();
+    };
+
+    const handleTaskDeleted = (event) => {
+      const deletedId = event.detail?.taskId;
+      if (!deletedId) return;
+      setTasks(prev => {
+        const next = prev.filter(task => task.taskId !== deletedId);
+        setStats(computeStats(next));
+        return next;
+      });
+    };
+    
+    window.addEventListener('taskUpdated', handleTaskUpdate);
+    window.addEventListener('taskDeleted', handleTaskDeleted);
+    
+    return () => {
+      window.removeEventListener('taskUpdated', handleTaskUpdate);
+      window.removeEventListener('taskDeleted', handleTaskDeleted);
+    };
   }, []);
 
   const loadTasks = async () => {
@@ -25,20 +89,36 @@ const Dashboard = () => {
       const response = await taskAPI.getTasks();
       console.log('Dashboard: getTasks response:', response);
       const taskList = response.data?.tasks || [];
+      const deletedTaskIds = getDeletedTaskIds();
+      const filteredTaskList = deletedTaskIds.length === 0
+        ? taskList
+        : taskList.filter(task => !deletedTaskIds.includes(task.taskId));
       console.log('Dashboard: Loaded tasks:', taskList.length);
-      setTasks(taskList);
-      
-      // Calculate stats
-      setStats({
-        total: taskList.length,
-        open: taskList.filter(t => t.status === 'open').length,
-        inProgress: taskList.filter(t => t.status === 'in-progress').length,
-        completed: taskList.filter(t => t.status === 'completed').length
-      });
+      applyTasks(filteredTaskList);
+
+      if (deletedTaskIds.length > 0) {
+        const remainingDeletedIds = deletedTaskIds.filter(id =>
+          taskList.some(task => task.taskId === id)
+        );
+        if (remainingDeletedIds.length !== deletedTaskIds.length) {
+          sessionStorage.setItem('deletedTaskIds', JSON.stringify(remainingDeletedIds));
+        }
+      }
     } catch (error) {
       console.error('Dashboard: Error loading tasks:', error);
       console.error('Dashboard: Error response:', error.response?.data);
-      setTasks([]);
+      
+      // Check if it's an authentication error
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        console.error('Authentication error - token may have expired');
+        alert('Your session has expired. Please log in again.');
+        // Clear storage and reload
+        sessionStorage.clear();
+        localStorage.clear();
+        window.location.reload();
+      } else {
+        setTasks([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -144,8 +224,21 @@ const Dashboard = () => {
               <p className="card-description">{task.description}</p>
               <div className="card-footer">
                 <div className="card-meta">
-                  <div className="assignee-avatar">
-                    {getInitials(task.assignedTo || task.createdByEmail)}
+                  <div className="card-assignees">
+                    {task.assignedUsers && task.assignedUsers.length > 0 ? (
+                      <>
+                        <div className="assignee-avatar">
+                          {getInitials(task.assignedUsers[0].userEmail || task.assignedUsers[0])}
+                        </div>
+                        {task.assignedUsers.length > 1 && (
+                          <span className="assignee-count">+{task.assignedUsers.length - 1}</span>
+                        )}
+                      </>
+                    ) : (
+                      <div className="assignee-avatar">
+                        {getInitials(task.createdByEmail)}
+                      </div>
+                    )}
                   </div>
                   <div className="card-info">
                     <span className="card-date">📅 {formatDate(task.dueDate)}</span>
@@ -159,6 +252,13 @@ const Dashboard = () => {
             </div>
           ))}
         </div>
+      )}
+      
+      {showSuccessModal && (
+        <SuccessModal
+          message="Task created successfully!"
+          onClose={() => setShowSuccessModal(false)}
+        />
       )}
     </div>
   );

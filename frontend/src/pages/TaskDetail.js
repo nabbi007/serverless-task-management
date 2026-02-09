@@ -2,29 +2,81 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { taskAPI } from '../services/api';
+import { Edit2, Users, Trash2 } from 'lucide-react';
 
 const TaskDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, userId } = useAuth();
   const [task, setTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [formData, setFormData] = useState({});
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [assigningUsers, setAssigningUsers] = useState(false);
+
+  const getDeletedTaskIds = () => {
+    try {
+      const raw = sessionStorage.getItem('deletedTaskIds');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.error('Error reading deleted task IDs:', error);
+      return [];
+    }
+  };
+
+  const rememberDeletedTaskId = (taskId) => {
+    if (!taskId) return;
+    const existing = getDeletedTaskIds();
+    if (existing.includes(taskId)) return;
+    sessionStorage.setItem('deletedTaskIds', JSON.stringify([...existing, taskId]));
+  };
+
+  const emitTaskDeleted = (taskId) => {
+    window.dispatchEvent(new CustomEvent('taskDeleted', { detail: { taskId } }));
+  };
 
   useEffect(() => {
     loadTask();
+    if (isAdmin()) {
+      loadUsers();
+    }
   }, [id]);
+
+  const loadUsers = async () => {
+    try {
+      const response = await taskAPI.getUsers();
+      const userList = response.data?.users || [];
+      setUsers(userList);
+    } catch (error) {
+      console.error('Error loading users:', error);
+    }
+  };
 
   const loadTask = async () => {
     try {
+      setLoading(true);
       const response = await taskAPI.getTask(id);
-      const taskData = response.data?.data || response.data;
+      console.log('TaskDetail: getTask response:', response);
+      const taskData = response.data;
+      console.log('TaskDetail: Task data:', taskData);
       setTask(taskData);
       setFormData(taskData);
     } catch (error) {
       console.error('Error loading task:', error);
-      alert('Failed to load task');
+      console.error('Error response:', error.response?.data);
+      if (error.response?.status === 404) {
+        rememberDeletedTaskId(id);
+        emitTaskDeleted(id);
+        window.dispatchEvent(new Event('taskUpdated'));
+        alert('Task not found. It may have been deleted.');
+        navigate('/', { replace: true });
+        return;
+      }
+      alert('Failed to load task: ' + (error.response?.data?.message || error.message));
     } finally {
       setLoading(false);
     }
@@ -36,11 +88,43 @@ const TaskDetail = () => {
       await taskAPI.updateTask(id, formData);
       alert('Task updated successfully');
       setEditing(false);
-      loadTask();
+      await loadTask(); // Reload task to get updated data
+      // Trigger a refresh event for dashboard
+      window.dispatchEvent(new Event('taskUpdated'));
     } catch (error) {
       console.error('Error updating task:', error);
-      alert('Failed to update task');
+      alert('Failed to update task: ' + (error.response?.data?.message || error.message));
     }
+  };
+
+  const handleAssignUsers = async () => {
+    if (selectedUsers.length === 0) {
+      alert('Please select at least one user');
+      return;
+    }
+
+    setAssigningUsers(true);
+    try {
+      await taskAPI.assignTask(id, selectedUsers);
+      alert(`Task assigned to ${selectedUsers.length} user(s) successfully!`);
+      setShowAssignModal(false);
+      setSelectedUsers([]);
+      await loadTask();
+      window.dispatchEvent(new Event('taskUpdated'));
+    } catch (error) {
+      console.error('Error assigning users:', error);
+      alert('Failed to assign users: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setAssigningUsers(false);
+    }
+  };
+
+  const toggleUserSelection = (userId) => {
+    setSelectedUsers(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
   };
 
   const handleDelete = async () => {
@@ -48,12 +132,31 @@ const TaskDetail = () => {
     
     try {
       await taskAPI.deleteTask(id);
-      alert('Task deleted successfully');
-      navigate('/tasks');
+      // Set flag for dashboard to reload
+      sessionStorage.setItem('taskDeletedSuccess', 'true');
+      // Also dispatch event for other components
+      window.dispatchEvent(new Event('taskUpdated'));
+      rememberDeletedTaskId(id);
+      emitTaskDeleted(id);
+      navigate('/', { replace: true });
     } catch (error) {
       console.error('Error deleting task:', error);
-      alert('Failed to delete task');
+      alert('Failed to delete task: ' + (error.response?.data?.message || error.message));
     }
+  };
+
+  // Check if current user can edit this task
+  const canEditTask = () => {
+    if (isAdmin()) return true;
+    if (!task || !task.assignedUsers) return false;
+    
+    // Check if current user is assigned to this task
+    return task.assignedUsers.some(assignedUser => {
+      if (typeof assignedUser === 'string') {
+        return assignedUser === userId;
+      }
+      return assignedUser.userId === userId;
+    });
   };
 
   if (loading) {
@@ -71,13 +174,20 @@ const TaskDetail = () => {
         <div className="task-actions">
           {!editing && (
             <>
-              <button onClick={() => setEditing(true)} className="btn btn-secondary">
-                Edit
-              </button>
-              {isAdmin() && (
-                <button onClick={handleDelete} className="btn btn-danger">
-                  Delete
+              {canEditTask() && (
+                <button onClick={() => setEditing(true)} className="btn btn-secondary">
+                  <Edit2 size={18} /> Edit
                 </button>
+              )}
+              {isAdmin() && (
+                <>
+                  <button onClick={() => setShowAssignModal(true)} className="btn btn-primary">
+                    <Users size={18} /> Assign
+                  </button>
+                  <button onClick={handleDelete} className="btn btn-danger">
+                    <Trash2 size={18} />
+                  </button>
+                </>
               )}
             </>
           )}
@@ -206,13 +316,70 @@ const TaskDetail = () => {
           {task.assignedUsers && task.assignedUsers.length > 0 && (
             <div className="detail-section">
               <h3>Assigned Users</h3>
-              <ul>
-                {task.assignedUsers.map((userId, index) => (
-                  <li key={index}>{userId}</li>
+              <div className="assigned-users-list">
+                {task.assignedUsers.map((user, index) => (
+                  <div key={index} className="assigned-user-card">
+                    <div className="user-avatar">{user.userEmail?.substring(0, 2).toUpperCase() || '??'}</div>
+                    <div className="user-info">
+                      <div className="user-email">{user.userEmail || user.userId}</div>
+                      <div className="user-assigned-date">
+                        Assigned {new Date(user.assignedAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Assign Users Modal */}
+      {showAssignModal && (
+        <div className="modal-overlay" onClick={() => setShowAssignModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Assign Users to Task</h3>
+              <button className="modal-close" onClick={() => setShowAssignModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p>Select users to assign to this task:</p>
+              <div className="users-selection-list">
+                {users.map(user => (
+                  <label key={user.userId} className="user-checkbox-item">
+                    <input
+                      type="checkbox"
+                      checked={selectedUsers.includes(user.userId)}
+                      onChange={() => toggleUserSelection(user.userId)}
+                    />
+                    <div className="user-avatar">{user.email?.substring(0, 2).toUpperCase() || '??'}</div>
+                    <div className="user-details">
+                      <div>{user.email}</div>
+                      <small>{user.name || 'No name'}</small>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="btn btn-primary" 
+                onClick={handleAssignUsers}
+                disabled={assigningUsers || selectedUsers.length === 0}
+              >
+                {assigningUsers ? 'Assigning...' : `Assign ${selectedUsers.length} User(s)`}
+              </button>
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => {
+                  setShowAssignModal(false);
+                  setSelectedUsers([]);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -35,7 +35,17 @@ const canAccessTask = (user, task) => {
   }
   
   // Members can only access tasks assigned to them
-  return task.assignedUsers && task.assignedUsers.includes(user.userId);
+  if (!task.assignedUsers || task.assignedUsers.length === 0) {
+    return false;
+  }
+  
+  // Handle both array of strings and array of objects
+  return task.assignedUsers.some(assignedUser => {
+    if (typeof assignedUser === 'string') {
+      return assignedUser === user.userId;
+    }
+    return assignedUser.userId === user.userId;
+  });
 };
 
 const canUpdateTask = (user, task) => {
@@ -44,7 +54,17 @@ const canUpdateTask = (user, task) => {
   }
   
   // Members can update tasks assigned to them
-  return task.assignedUsers && task.assignedUsers.includes(user.userId);
+  if (!task.assignedUsers || task.assignedUsers.length === 0) {
+    return false;
+  }
+  
+  // Handle both array of strings and array of objects
+  return task.assignedUsers.some(assignedUser => {
+    if (typeof assignedUser === 'string') {
+      return assignedUser === user.userId;
+    }
+    return assignedUser.userId === user.userId;
+  });
 };
 
 module.exports = {

@@ -46,23 +46,38 @@ exports.handler = async (event) => {
     logger.info('Deleting task and assignments', { taskId, createdBy: task.createdBy });
     
     // Delete all assignments for this task
-    const assignmentResult = await query(
-      process.env.ASSIGNMENTS_TABLE,
-      'taskId = :taskId',
-      { ':taskId': taskId },
-      'TaskIndex'
-    );
-    
-    const assignments = assignmentResult.items || assignmentResult;
-    
-    logger.logDBOperation('deleteItems', process.env.ASSIGNMENTS_TABLE, { count: assignments.length });
+    let assignments = [];
+    try {
+      const assignmentResult = await query(
+        process.env.ASSIGNMENTS_TABLE,
+        'taskId = :taskId',
+        { ':taskId': taskId },
+        'TaskIndex'
+      );
+      
+      assignments = assignmentResult.items || [];
+      logger.info('Found assignments to delete', { count: assignments.length });
+    } catch (queryError) {
+      logger.warn('Error querying assignments, continuing with delete', { error: queryError.message });
+      // Continue even if query fails - task will be deleted anyway
+    }
     
     // Delete assignments in parallel for better performance
-    await Promise.all(
-      assignments.map(assignment => 
-        deleteItem(process.env.ASSIGNMENTS_TABLE, { assignmentId: assignment.assignmentId })
-      )
-    );
+    if (assignments.length > 0) {
+      logger.logDBOperation('deleteItems', process.env.ASSIGNMENTS_TABLE, { count: assignments.length });
+      
+      try {
+        await Promise.all(
+          assignments.map(assignment => 
+            deleteItem(process.env.ASSIGNMENTS_TABLE, { assignmentId: assignment.assignmentId })
+          )
+        );
+        logger.info('Assignments deleted successfully', { count: assignments.length });
+      } catch (deleteError) {
+        logger.warn('Error deleting some assignments', { error: deleteError.message });
+        // Continue with task deletion even if some assignments fail
+      }
+    }
     
     // Delete the task
     logger.logDBOperation('deleteItem', process.env.TASKS_TABLE, { taskId });

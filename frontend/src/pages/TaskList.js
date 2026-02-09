@@ -14,14 +14,66 @@ const TaskList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const tasksPerPage = 6;
 
+  const getDeletedTaskIds = () => {
+    try {
+      const raw = sessionStorage.getItem('deletedTaskIds');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      console.error('Error reading deleted task IDs:', error);
+      return [];
+    }
+  };
+
   useEffect(() => {
     loadTasks();
+    
+    // Check if task was just deleted - reload tasks
+    const taskDeleted = sessionStorage.getItem('taskDeletedSuccess');
+    if (taskDeleted === 'true') {
+      sessionStorage.removeItem('taskDeletedSuccess');
+      setTimeout(() => loadTasks(), 100);
+    }
+    
+    // Listen for task updates
+    const handleTaskUpdate = () => {
+      console.log('TaskList: Task updated, reloading...');
+      loadTasks();
+    };
+
+    const handleTaskDeleted = (event) => {
+      const deletedId = event.detail?.taskId;
+      if (!deletedId) return;
+      setTasks(prev => prev.filter(task => task.taskId !== deletedId));
+    };
+    
+    window.addEventListener('taskUpdated', handleTaskUpdate);
+    window.addEventListener('taskDeleted', handleTaskDeleted);
+    
+    return () => {
+      window.removeEventListener('taskUpdated', handleTaskUpdate);
+      window.removeEventListener('taskDeleted', handleTaskDeleted);
+    };
   }, []);
 
   const loadTasks = async () => {
     try {
       const response = await taskAPI.getTasks();
-      setTasks(response.data?.tasks || []);
+      const taskList = response.data?.tasks || [];
+      const deletedTaskIds = getDeletedTaskIds();
+      const filteredTaskList = deletedTaskIds.length === 0
+        ? taskList
+        : taskList.filter(task => !deletedTaskIds.includes(task.taskId));
+      setTasks(filteredTaskList);
+
+      if (deletedTaskIds.length > 0) {
+        const remainingDeletedIds = deletedTaskIds.filter(id =>
+          taskList.some(task => task.taskId === id)
+        );
+        if (remainingDeletedIds.length !== deletedTaskIds.length) {
+          sessionStorage.setItem('deletedTaskIds', JSON.stringify(remainingDeletedIds));
+        }
+      }
     } catch (error) {
       console.error('Error loading tasks:', error);
     } finally {

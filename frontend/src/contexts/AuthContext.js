@@ -14,6 +14,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children, user }) => {
   const [userRole, setUserRole] = useState('member');
   const [idToken, setIdToken] = useState(null);
+  const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,6 +25,7 @@ export const AuthProvider = ({ children, user }) => {
         
         if (token) {
           setIdToken(token.toString());
+          setUserId(token.payload.sub);
           const groups = token.payload['cognito:groups'] || [];
           const customRole = token.payload['custom:role'];
           
@@ -49,6 +51,7 @@ export const AuthProvider = ({ children, user }) => {
   const isMember = () => userRole === 'member';
 
   const value = {
+    userId,
     user,
     userRole,
     idToken,

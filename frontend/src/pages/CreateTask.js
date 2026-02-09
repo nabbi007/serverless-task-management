@@ -56,9 +56,10 @@ const CreateTask = () => {
       const response = await taskAPI.createTask(cleanedData);
       console.log('Task created response:', response);
       
-      alert('Task created successfully!');
-      const taskId = response.data?.data?.taskId || response.data?.taskId;
-      navigate(`/tasks/${taskId}`);
+      // Store success flag and redirect to dashboard
+      sessionStorage.setItem('taskCreatedSuccess', 'true');
+      window.dispatchEvent(new Event('taskUpdated'));
+      navigate('/');
     } catch (error) {
       console.error('Error creating task:', error);
       console.error('Error response:', error.response?.data);
@@ -178,7 +179,7 @@ const CreateTask = () => {
           </button>
           <button
             type="button"
-            onClick={() => navigate('/tasks')}
+            onClick={() => navigate('/')}
             className="btn btn-secondary"
           >
             Cancel
