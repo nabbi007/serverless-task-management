@@ -19,7 +19,20 @@ const CreateTask = () => {
     setLoading(true);
 
     try {
-      const response = await taskAPI.createTask(formData);
+      // Clean up form data - convert empty strings to null
+      const cleanedData = {
+        title: formData.title,
+        description: formData.description,
+        priority: formData.priority,
+        dueDate: formData.dueDate || null,
+        timeEstimate: formData.timeEstimate ? parseFloat(formData.timeEstimate) : null,
+        assignedTo: formData.assignedTo || null
+      };
+      
+      console.log('Creating task with data:', cleanedData);
+      const response = await taskAPI.createTask(cleanedData);
+      console.log('Task created response:', response);
+      
       alert('Task created successfully!');
       const taskId = response.data?.data?.taskId || response.data?.taskId;
       navigate(`/tasks/${taskId}`);
