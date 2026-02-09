@@ -7,6 +7,7 @@ output "function_arns" {
     update_task = aws_lambda_function.update_task.arn
     delete_task = aws_lambda_function.delete_task.arn
     assign_task = aws_lambda_function.assign_task.arn
+    get_users   = aws_lambda_function.get_users.arn
   }
 }
 
@@ -19,6 +20,7 @@ output "function_names" {
     update_task = aws_lambda_function.update_task.function_name
     delete_task = aws_lambda_function.delete_task.function_name
     assign_task = aws_lambda_function.assign_task.function_name
+    get_users   = aws_lambda_function.get_users.function_name
   }
 }
 
@@ -31,5 +33,6 @@ output "function_invoke_arns" {
     update_task = aws_lambda_function.update_task.invoke_arn
     delete_task = aws_lambda_function.delete_task.invoke_arn
     assign_task = aws_lambda_function.assign_task.invoke_arn
+    get_users   = aws_lambda_function.get_users.invoke_arn
   }
 }

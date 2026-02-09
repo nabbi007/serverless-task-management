@@ -38,12 +38,18 @@ exports.handler = async (event) => {
     
     // For each task, get assignment details (for displaying who is assigned)
     for (const task of tasks) {
-      const assignmentResult = await query(
-        process.env.ASSIGNMENTS_TABLE,
-        'taskId = :taskId',
-        { ':taskId': task.taskId }
-      );
-      task.assignedUsers = assignmentResult.items.map(a => a.userId);
+      try {
+        const assignmentResult = await query(
+          process.env.ASSIGNMENTS_TABLE,
+          'taskId = :taskId',
+          { ':taskId': task.taskId },
+          'TaskIndex'
+        );
+        task.assignedUsers = assignmentResult.items.map(a => a.userId);
+      } catch (assignmentError) {
+        console.error(`Error fetching assignments for task ${task.taskId}:`, assignmentError);
+        task.assignedUsers = [];
+      }
     }
     
     const duration = Date.now() - startTime;

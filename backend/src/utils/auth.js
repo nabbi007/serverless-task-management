@@ -14,7 +14,9 @@ const getUserFromEvent = (event) => {
 };
 
 const isAdmin = (user) => {
-  return user.role === 'admin' || user.groups.includes('admin');
+  return user.role === 'admin' || 
+         user.groups.includes('admin') || 
+         user.groups.includes('Admins');
 };
 
 const isMember = (user) => {

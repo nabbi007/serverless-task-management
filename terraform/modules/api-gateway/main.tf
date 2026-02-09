@@ -131,6 +131,13 @@ resource "aws_api_gateway_resource" "task_assign" {
   path_part   = "assign"
 }
 
+# /users resource
+resource "aws_api_gateway_resource" "users" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_rest_api.main.root_resource_id
+  path_part   = "users"
+}
+
 # POST /tasks - Create Task
 module "create_task_endpoint" {
   source = "./endpoint"
@@ -209,6 +216,19 @@ module "assign_task_endpoint" {
   aws_region    = var.aws_region
 }
 
+# GET /users - List Users (Admin only)
+module "get_users_endpoint" {
+  source = "./endpoint"
+  
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.users.id
+  http_method   = "GET"
+  authorizer_id = aws_api_gateway_authorizer.cognito.id
+  lambda_arn    = var.lambda_functions["get_users"]
+  function_name = "get_users"
+  aws_region    = var.aws_region
+}
+
 # CORS configuration for all resources
 module "tasks_cors" {
   source = "./cors"
@@ -229,6 +249,13 @@ module "task_assign_cors" {
   
   rest_api_id = aws_api_gateway_rest_api.main.id
   resource_id = aws_api_gateway_resource.task_assign.id
+}
+
+module "users_cors" {
+  source = "./cors"
+  
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.users.id
 }
 
 # Deployment

@@ -1,4 +1,4 @@
-const { query } = require('../utils/dynamodb');
+const { getItem, query } = require('../utils/dynamodb');
 const { getUserFromEvent, isAdmin } = require('../utils/auth');
 const { successResponse, errorResponse } = require('../utils/response');
 const { validateEnvVars } = require('../utils/validation');
@@ -25,37 +25,42 @@ exports.handler = async (event) => {
     // Get user from JWT token
     const user = getUserFromEvent(event);
     
-    // Query task by ID
-    const taskResult = await query(
+    // Get task by ID
+    const task = await getItem(
       process.env.TASKS_TABLE,
-      'taskId = :taskId',
-      { ':taskId': taskId }
+      { taskId: taskId }
     );
     
-    if (taskResult.items.length === 0) {
+    if (!task) {
       return errorResponse('Task not found', 404);
     }
-    
-    const task = taskResult.items[0];
     
     // All authenticated users can view tasks
     // Update/Delete permissions are checked in those handlers
     
     // Get all assignments for this task
-    const assignmentsResult = await query(
-      process.env.ASSIGNMENTS_TABLE,
-      'taskId = :taskId',
-      { ':taskId': taskId }
-    );
-    
-    const taskWithAssignments = {
-      ...task,
-      assignedUsers: assignmentsResult.items.map(a => ({
+    let assignedUsers = [];
+    try {
+      const assignmentsResult = await query(
+        process.env.ASSIGNMENTS_TABLE,
+        'taskId = :taskId',
+        { ':taskId': taskId },
+        'TaskIndex'
+      );
+      assignedUsers = assignmentsResult.items.map(a => ({
         userId: a.userId,
         userName: a.userName,
         userEmail: a.userEmail,
         assignedAt: a.assignedAt
-      }))
+      }));
+    } catch (assignmentError) {
+      console.error('Error fetching assignments for task:', assignmentError);
+      // Continue without assignments if query fails
+    }
+    
+    const taskWithAssignments = {
+      ...task,
+      assignedUsers: assignedUsers
     };
     
     const duration = Date.now() - startTime;

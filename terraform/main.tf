@@ -75,6 +75,7 @@ module "lambda" {
   assignments_table_name    = module.dynamodb.assignments_table_name
   cognito_user_pool_id      = module.cognito.user_pool_id
   lambda_layer_arn          = module.lambda_layer.layer_arn
+  aws_region                = var.aws_region
 }
 
 # API Gateway

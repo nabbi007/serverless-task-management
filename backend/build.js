@@ -8,7 +8,8 @@ const handlers = [
   'getTask',
   'updateTask',
   'deleteTask',
-  'assignTask'
+  'assignTask',
+  'getUsers'
 ];
 
 // Create dist directory

@@ -175,3 +175,31 @@ resource "aws_cloudwatch_log_group" "assign_task" {
   name              = "/aws/lambda/${aws_lambda_function.assign_task.function_name}"
   retention_in_days = 14
 }
+
+# Get Users Lambda (Admin only - list Cognito users)
+resource "aws_lambda_function" "get_users" {
+  filename         = "${path.root}/lambda-packages/get-users.zip"
+  function_name    = "${var.project_name}-${var.environment}-get-users"
+  role             = var.lambda_execution_role_arn
+  handler          = "handlers/getUsers.handler"
+  runtime          = "nodejs18.x"
+  timeout          = 10
+  memory_size      = 256
+  source_code_hash = filebase64sha256("${path.root}/lambda-packages/get-users.zip")
+  layers           = var.lambda_layer_arn != "" ? [var.lambda_layer_arn] : []
+  
+  environment {
+    variables = {
+      USER_POOL_ID = var.cognito_user_pool_id
+    }
+  }
+  
+  tracing_config {
+    mode = "Active"
+  }
+}
+
+resource "aws_cloudwatch_log_group" "get_users" {
+  name              = "/aws/lambda/${aws_lambda_function.get_users.function_name}"
+  retention_in_days = 14
+}
