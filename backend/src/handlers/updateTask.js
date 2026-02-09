@@ -37,7 +37,7 @@ exports.handler = async (event) => {
     }
     
     const body = JSON.parse(event.body);
-    const { title, description, status, priority, dueDate } = body;
+    const { title, description, status, priority, dueDate, timeEstimate, assignedTo } = body;
     
     // Validate enums if provided
     if (status && !validateStatus(status)) {
@@ -46,6 +46,11 @@ exports.handler = async (event) => {
     
     if (priority && !validatePriority(priority)) {
       return errorResponse('Invalid priority value. Must be: low, medium, or high', 400);
+    }
+    
+    // Validate timeEstimate if provided
+    if (timeEstimate !== undefined && timeEstimate !== null && (isNaN(timeEstimate) || timeEstimate < 0)) {
+      return errorResponse('Invalid timeEstimate value. Must be a positive number', 400);
     }
     
     logger.logDBOperation('getItem', process.env.TASKS_TABLE, { taskId });
@@ -102,6 +107,16 @@ exports.handler = async (event) => {
     if (dueDate !== undefined) {
       updateExpressions.push('dueDate = :dueDate');
       expressionAttributeValues[':dueDate'] = dueDate;
+    }
+    
+    if (timeEstimate !== undefined) {
+      updateExpressions.push('timeEstimate = :timeEstimate');
+      expressionAttributeValues[':timeEstimate'] = timeEstimate;
+    }
+    
+    if (assignedTo !== undefined) {
+      updateExpressions.push('assignedTo = :assignedTo');
+      expressionAttributeValues[':assignedTo'] = assignedTo;
     }
     
     updateExpressions.push('updatedAt = :updatedAt');

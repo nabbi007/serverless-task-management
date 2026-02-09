@@ -24,61 +24,37 @@ exports.handler = async (event) => {
     const lastKey = event.queryStringParameters?.lastKey ? 
       JSON.parse(decodeURIComponent(event.queryStringParameters.lastKey)) : null;
     
-    let result;
+    // All authenticated users can see all tasks
+    console.log('Fetching all tasks', { limit, isAdmin: isAdmin(user) });
     
-    if (isAdmin(user)) {
-      console.log('Admin fetching all tasks', { limit });
-      
-      // Admins can see all tasks - use scan with pagination
-      result = await scan(process.env.TASKS_TABLE, null, null, limit, lastKey);
-      
-    } else {
-      console.log('Member fetching assigned tasks', { userId: user.userId, limit });
-      
-      // Members can only see tasks assigned to them
+    const result = await scan(process.env.TASKS_TABLE, null, null, limit, lastKey);
+    
+    if (result.items.length === 0) {
+      console.log('No tasks found');
+      return successResponse({ tasks: [], lastEvaluatedKey: null }, 200, true);
+    }
+    
+    const tasks = result.items;
+    
+    // For each task, get assignment details (for displaying who is assigned)
+    for (const task of tasks) {
       const assignmentResult = await query(
         process.env.ASSIGNMENTS_TABLE,
-        'userId = :userId',
-        { ':userId': user.userId },
-        'UserIndex',
-        limit
+        'taskId = :taskId',
+        { ':taskId': task.taskId }
       );
-      
-      const taskIds = assignmentResult.items.map(a => a.taskId);
-      
-      if (taskIds.length === 0) {
-        console.log('No tasks assigned to user');
-        return successResponse({ tasks: [], lastEvaluatedKey: null }, 200, true); // Cacheable
-      }
-      
-      // Get task details
-      const tasks = [];
-      for (const taskId of taskIds) {
-        const taskResult = await query(
-          process.env.TASKS_TABLE,
-          'taskId = :taskId',
-          { ':taskId': taskId }
-        );
-        if (taskResult.items.length > 0) {
-          tasks.push(taskResult.items[0]);
-        }
-      }
-      
-      result = { 
-        items: tasks,
-        lastEvaluatedKey: assignmentResult.lastEvaluatedKey 
-      };
+      task.assignedUsers = assignmentResult.items.map(a => a.userId);
     }
     
     const duration = Date.now() - startTime;
     console.log('Tasks fetched successfully', { 
-      count: result.items.length, 
+      count: tasks.length, 
       duration: `${duration}ms`,
       hasMore: !!result.lastEvaluatedKey 
     });
     
     return successResponse({ 
-      tasks: result.items,
+      tasks: tasks,
       lastEvaluatedKey: result.lastEvaluatedKey ? 
         encodeURIComponent(JSON.stringify(result.lastEvaluatedKey)) : null
     }, 200, true); // Cacheable for read operations

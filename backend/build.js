@@ -1,5 +1,6 @@
 const fs = require('fs');
 const archiver = require('archiver');
+const path = require('path');
 
 const handlers = [
   'createTask',
@@ -15,7 +16,7 @@ if (!fs.existsSync('dist')) {
   fs.mkdirSync('dist');
 }
 
-console.log(' Building Lambda packages (optimized with layers)...\n');
+console.log(' Building Lambda packages...\n');
 
 handlers.forEach(handler => {
   const zipName = handler.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '');
@@ -33,11 +34,14 @@ handlers.forEach(handler => {
 
   archive.pipe(output);
   
-  // Add ONLY the handler file (utils and node_modules are in the layer)
+  // Add the handler file
   archive.file(`src/handlers/${handler}.js`, { name: `handlers/${handler}.js` });
+  
+  // Add utils directory (required by handlers)
+  archive.directory('src/utils', 'utils');
   
   archive.finalize();
 });
 
-console.log('\n All Lambda packages built successfully (optimized)!');
-console.log(' Remember to build the layer: node build-layer.js');
+console.log('\n All Lambda packages built successfully!');
+

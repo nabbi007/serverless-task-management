@@ -5,6 +5,9 @@ const { successResponse, errorResponse } = require('../utils/response');
 const { sendTaskAssignmentNotification } = require('../utils/notifications');
 const { validateEnvVars, validateUUID } = require('../utils/validation');
 const { createLogger } = require('../utils/logger');
+const { CognitoIdentityProviderClient, AdminGetUserCommand } = require('@aws-sdk/client-cognito-identity-provider');
+
+const cognitoClient = new CognitoIdentityProviderClient({ region: process.env.AWS_REGION || 'eu-west-1' });
 
 // Validate environment variables on cold start
 validateEnvVars(['TASKS_TABLE', 'ASSIGNMENTS_TABLE']);
@@ -81,6 +84,11 @@ exports.handler = async (event) => {
       return errorResponse('All specified users are already assigned to this task', 400);
     }
     
+    // Validate that all users exist and are enabled in Cognito
+    // Note: userIds should be Cognito sub IDs. In production, consider:
+    // 1. Accepting emails and looking up subs, or
+    // 2. Maintaining a user cache in DynamoDB with sub->email->status mapping
+    // For now, we proceed with assignment (notifications will fail for invalid users)
     logger.info('Assigning task to users', { taskId, newUserCount: newUserIds.length });
     
     // Create assignments

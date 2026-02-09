@@ -31,7 +31,7 @@ exports.handler = async (event) => {
     // Validate required fields
     validateRequiredFields(body, ['title', 'description']);
     
-    const { title, description, priority, dueDate } = body;
+    const { title, description, priority, dueDate, timeEstimate, assignedTo } = body;
     
     // Validate and sanitize inputs
     const sanitizedTitle = sanitizeString(title, 200);
@@ -46,6 +46,14 @@ exports.handler = async (event) => {
       return errorResponse('Invalid priority value. Must be: low, medium, or high', 400);
     }
     
+    // Validate timeEstimate if provided (must be positive number)
+    if (timeEstimate !== null && timeEstimate !== undefined && timeEstimate !== '') {
+      const parsedTime = parseFloat(timeEstimate);
+      if (isNaN(parsedTime) || parsedTime < 0) {
+        return errorResponse('Invalid timeEstimate value. Must be a positive number', 400);
+      }
+    }
+    
     // Create task object
     const task = {
       taskId: uuidv4(),
@@ -54,6 +62,8 @@ exports.handler = async (event) => {
       priority: priority || 'medium',
       status: 'open',
       dueDate: dueDate || null,
+      timeEstimate: timeEstimate ? parseFloat(timeEstimate) : null,
+      assignedTo: assignedTo || null,
       createdBy: user.userId,
       createdByEmail: user.email,
       createdAt: new Date().toISOString(),

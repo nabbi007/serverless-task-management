@@ -38,20 +38,8 @@ exports.handler = async (event) => {
     
     const task = taskResult.items[0];
     
-    // Check authorization
-    if (!isAdmin(user)) {
-      // Members can only see tasks assigned to them
-      const assignmentResult = await query(
-        process.env.ASSIGNMENTS_TABLE,
-        'taskId = :taskId AND userId = :userId',
-        { ':taskId': taskId, ':userId': user.userId },
-        'TaskUserIndex'
-      );
-      
-      if (assignmentResult.items.length === 0) {
-        return errorResponse('Access denied', 403);
-      }
-    }
+    // All authenticated users can view tasks
+    // Update/Delete permissions are checked in those handlers
     
     // Get all assignments for this task
     const assignmentsResult = await query(

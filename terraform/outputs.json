@@ -1,0 +1,32 @@
+{
+  "api_gateway_endpoint": {
+    "sensitive": false,
+    "type": "string",
+    "value": "https://ksu88po2z0.execute-api.eu-west-1.amazonaws.com/dev"
+  },
+  "assignments_table_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "task-management-dev-assignments"
+  },
+  "cognito_user_pool_client_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "5raf5i5dk9glielc274o54mcvm"
+  },
+  "cognito_user_pool_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "eu-west-1_nHXKiHNUz"
+  },
+  "lambda_layer_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:lambda:eu-west-1:049618907165:layer:task-management-dev-dependencies:7"
+  },
+  "tasks_table_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "task-management-dev-tasks"
+  }
+}
