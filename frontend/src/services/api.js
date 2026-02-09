@@ -63,5 +63,12 @@ export const taskAPI = {
       { headers }
     );
     return response.data;
+  },
+
+  // Get all users (admin only)
+  getUsers: async () => {
+    const headers = await getAuthHeaders();
+    const response = await axios.get(`${API_ENDPOINT}/users`, { headers });
+    return response.data;
   }
 };

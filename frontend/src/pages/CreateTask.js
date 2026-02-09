@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { taskAPI } from '../services/api';
 
@@ -13,6 +13,26 @@ const CreateTask = () => {
     assignedTo: ''
   });
   const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    try {
+      const response = await taskAPI.getUsers();
+      console.log('Users loaded:', response);
+      setUsers(response.data?.users || []);
+    } catch (error) {
+      console.error('Error loading users:', error);
+      // Don't show error to user, just log it
+      setUsers([]);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -117,14 +137,21 @@ const CreateTask = () => {
         <div className="form-row">
           <div className="form-group">
             <label htmlFor="assignedTo">Assigned To</label>
-            <input
-              type="text"
+            <select
               id="assignedTo"
               name="assignedTo"
               value={formData.assignedTo}
               onChange={handleChange}
-              placeholder="Enter assignee name"
-            />
+              disabled={loadingUsers}
+            >
+              <option value="">-- Select User --</option>
+              {users.map(user => (
+                <option key={user.userId} value={user.email}>
+                  {user.name} ({user.email})
+                </option>
+              ))}
+            </select>
+            {loadingUsers && <small>Loading users...</small>}
           </div>
 
           <div className="form-group">
