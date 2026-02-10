@@ -16,6 +16,44 @@ const TaskDetail = () => {
   const [users, setUsers] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [assigningUsers, setAssigningUsers] = useState(false);
+  const UPDATED_TASKS_KEY = 'updatedTasks';
+
+  const normalizeTask = (taskData) => {
+    if (!taskData) return taskData;
+    if (taskData.taskId) return taskData;
+    return { ...taskData, taskId: taskData.id || id };
+  };
+
+  const getUpdatedTasks = () => {
+    try {
+      const raw = sessionStorage.getItem(UPDATED_TASKS_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (error) {
+      console.error('Error reading updated tasks:', error);
+      return {};
+    }
+  };
+
+  const rememberUpdatedTask = (taskData) => {
+    const normalized = normalizeTask(taskData);
+    if (!normalized?.taskId) return;
+    const updates = getUpdatedTasks();
+    updates[normalized.taskId] = {
+      ...updates[normalized.taskId],
+      ...normalized,
+      _clientUpdatedAt: Date.now()
+    };
+    sessionStorage.setItem(UPDATED_TASKS_KEY, JSON.stringify(updates));
+  };
+
+  const removeUpdatedTask = (taskId) => {
+    if (!taskId) return;
+    const updates = getUpdatedTasks();
+    if (!updates[taskId]) return;
+    delete updates[taskId];
+    sessionStorage.setItem(UPDATED_TASKS_KEY, JSON.stringify(updates));
+  };
 
   const getDeletedTaskIds = () => {
     try {
@@ -37,6 +75,16 @@ const TaskDetail = () => {
 
   const emitTaskDeleted = (taskId) => {
     window.dispatchEvent(new CustomEvent('taskDeleted', { detail: { taskId } }));
+  };
+
+  const emitTaskUpdated = (updatedTask) => {
+    if (updatedTask) {
+      const taskWithId = normalizeTask(updatedTask);
+      rememberUpdatedTask(taskWithId);
+      window.dispatchEvent(new CustomEvent('taskUpdated', { detail: { task: taskWithId } }));
+      return;
+    }
+    window.dispatchEvent(new Event('taskUpdated'));
   };
 
   useEffect(() => {
@@ -61,22 +109,24 @@ const TaskDetail = () => {
       setLoading(true);
       const response = await taskAPI.getTask(id);
       console.log('TaskDetail: getTask response:', response);
-      const taskData = response.data;
+      const taskData = normalizeTask(response.data);
       console.log('TaskDetail: Task data:', taskData);
       setTask(taskData);
       setFormData(taskData);
+      return taskData;
     } catch (error) {
       console.error('Error loading task:', error);
       console.error('Error response:', error.response?.data);
       if (error.response?.status === 404) {
         rememberDeletedTaskId(id);
         emitTaskDeleted(id);
-        window.dispatchEvent(new Event('taskUpdated'));
+        emitTaskUpdated();
         alert('Task not found. It may have been deleted.');
         navigate('/', { replace: true });
         return;
       }
       alert('Failed to load task: ' + (error.response?.data?.message || error.message));
+      return null;
     } finally {
       setLoading(false);
     }
@@ -85,12 +135,15 @@ const TaskDetail = () => {
   const handleUpdate = async (e) => {
     e.preventDefault();
     try {
-      await taskAPI.updateTask(id, formData);
+      const response = await taskAPI.updateTask(id, formData);
+      const updatedFromResponse = normalizeTask(response?.data?.task || response?.data || response?.task);
       alert('Task updated successfully');
       setEditing(false);
-      await loadTask(); // Reload task to get updated data
+      const refreshedTask = await loadTask(); // Reload task to get updated data
+      const fallbackTask = normalizeTask({ ...task, ...formData });
+      const finalTask = refreshedTask || updatedFromResponse || fallbackTask;
       // Trigger a refresh event for dashboard
-      window.dispatchEvent(new Event('taskUpdated'));
+      emitTaskUpdated(finalTask);
     } catch (error) {
       console.error('Error updating task:', error);
       alert('Failed to update task: ' + (error.response?.data?.message || error.message));
@@ -109,8 +162,8 @@ const TaskDetail = () => {
       alert(`Task assigned to ${selectedUsers.length} user(s) successfully!`);
       setShowAssignModal(false);
       setSelectedUsers([]);
-      await loadTask();
-      window.dispatchEvent(new Event('taskUpdated'));
+      const refreshedTask = await loadTask();
+      emitTaskUpdated(refreshedTask);
     } catch (error) {
       console.error('Error assigning users:', error);
       alert('Failed to assign users: ' + (error.response?.data?.message || error.message));
@@ -135,8 +188,9 @@ const TaskDetail = () => {
       // Set flag for dashboard to reload
       sessionStorage.setItem('taskDeletedSuccess', 'true');
       // Also dispatch event for other components
-      window.dispatchEvent(new Event('taskUpdated'));
+      emitTaskUpdated();
       rememberDeletedTaskId(id);
+      removeUpdatedTask(id);
       emitTaskDeleted(id);
       navigate('/', { replace: true });
     } catch (error) {

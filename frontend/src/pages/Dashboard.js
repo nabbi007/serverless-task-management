@@ -16,6 +16,7 @@ const Dashboard = () => {
     completed: 0
   });
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const UPDATED_TASKS_KEY = 'updatedTasks';
 
   const getDeletedTaskIds = () => {
     try {
@@ -28,6 +29,21 @@ const Dashboard = () => {
     }
   };
 
+  const getUpdatedTasks = () => {
+    try {
+      const raw = sessionStorage.getItem(UPDATED_TASKS_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (error) {
+      console.error('Error reading updated tasks:', error);
+      return {};
+    }
+  };
+
+  const saveUpdatedTasks = (updates) => {
+    sessionStorage.setItem(UPDATED_TASKS_KEY, JSON.stringify(updates));
+  };
+
   const computeStats = (taskList) => ({
     total: taskList.length,
     open: taskList.filter(t => t.status === 'open').length,
@@ -38,6 +54,64 @@ const Dashboard = () => {
   const applyTasks = (taskList) => {
     setTasks(taskList);
     setStats(computeStats(taskList));
+  };
+
+  const applyTaskUpdate = (updatedTask) => {
+    const updatedTaskId = updatedTask?.taskId || updatedTask?.id;
+    if (!updatedTaskId) return false;
+    if (getDeletedTaskIds().includes(updatedTaskId)) return true;
+    let found = false;
+    setTasks(prev => {
+      const index = prev.findIndex(task => (task.taskId || task.id) === updatedTaskId);
+      if (index === -1) {
+        return prev;
+      }
+      found = true;
+      const next = [...prev];
+      next[index] = { ...prev[index], ...updatedTask };
+      setStats(computeStats(next));
+      return next;
+    });
+    return found;
+  };
+
+  const mergeUpdatedTasks = (taskList) => {
+    const updates = getUpdatedTasks();
+    const updateIds = Object.keys(updates);
+    if (updateIds.length === 0) return taskList;
+
+    let changed = false;
+    const merged = taskList.map(task => {
+      const taskId = task.taskId || task.id;
+      const update = updates[taskId];
+      if (!update) return task;
+      const serverTime = task.updatedAt ? new Date(task.updatedAt).getTime() : 0;
+      const updateTime = update.updatedAt
+        ? new Date(update.updatedAt).getTime()
+        : (update._clientUpdatedAt || 0);
+
+      if (updateTime >= serverTime) {
+        return { ...task, ...update };
+      }
+
+      delete updates[taskId];
+      changed = true;
+      return task;
+    });
+
+    updateIds.forEach(id => {
+      const exists = taskList.some(task => (task.taskId || task.id) === id);
+      if (!exists && updates[id]) {
+        delete updates[id];
+        changed = true;
+      }
+    });
+
+    if (changed) {
+      saveUpdatedTasks(updates);
+    }
+
+    return merged;
   };
 
   useEffect(() => {
@@ -59,7 +133,16 @@ const Dashboard = () => {
     }
     
     // Listen for task updates
-    const handleTaskUpdate = () => {
+    const handleTaskUpdate = (event) => {
+      const updatedTask = event.detail?.task;
+      if (updatedTask && updatedTask.taskId) {
+        const applied = applyTaskUpdate(updatedTask);
+        if (!applied) {
+          console.log('Dashboard: Task updated, reloading...');
+          loadTasks();
+        }
+        return;
+      }
       console.log('Dashboard: Task updated, reloading...');
       loadTasks();
     };
@@ -92,13 +175,14 @@ const Dashboard = () => {
       const deletedTaskIds = getDeletedTaskIds();
       const filteredTaskList = deletedTaskIds.length === 0
         ? taskList
-        : taskList.filter(task => !deletedTaskIds.includes(task.taskId));
+        : taskList.filter(task => !deletedTaskIds.includes(task.taskId || task.id));
       console.log('Dashboard: Loaded tasks:', taskList.length);
-      applyTasks(filteredTaskList);
+      const mergedTaskList = mergeUpdatedTasks(filteredTaskList);
+      applyTasks(mergedTaskList);
 
       if (deletedTaskIds.length > 0) {
         const remainingDeletedIds = deletedTaskIds.filter(id =>
-          taskList.some(task => task.taskId === id)
+          taskList.some(task => (task.taskId || task.id) === id)
         );
         if (remainingDeletedIds.length !== deletedTaskIds.length) {
           sessionStorage.setItem('deletedTaskIds', JSON.stringify(remainingDeletedIds));
