@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { taskAPI } from '../services/api';
-import SuccessModal from '../components/SuccessModal';
 
 const Dashboard = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, userEmail } = useAuth();
   const navigate = useNavigate();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,7 +14,6 @@ const Dashboard = () => {
     inProgress: 0,
     completed: 0
   });
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const UPDATED_TASKS_KEY = 'updatedTasks';
 
   const getDeletedTaskIds = () => {
@@ -56,12 +54,34 @@ const Dashboard = () => {
     setStats(computeStats(taskList));
   };
 
+  const isTaskAssignedToUser = (task, email) => {
+    if (!email || !task) return false;
+    if (task.assignedTo && task.assignedTo === email) return true;
+    if (!task.assignedUsers || task.assignedUsers.length === 0) return false;
+
+    return task.assignedUsers.some(assignedUser => {
+      if (typeof assignedUser === 'string') {
+        return assignedUser === email;
+      }
+      return assignedUser.userEmail === email || assignedUser.userId === email;
+    });
+  };
+
   const applyTaskUpdate = (updatedTask) => {
     const updatedTaskId = updatedTask?.taskId || updatedTask?.id;
     if (!updatedTaskId) return false;
     if (getDeletedTaskIds().includes(updatedTaskId)) return true;
     let found = false;
     setTasks(prev => {
+      const shouldFilter = !isAdmin() && userEmail;
+      const hasAssignmentInfo = updatedTask.assignedUsers || updatedTask.assignedTo;
+      if (shouldFilter && hasAssignmentInfo && !isTaskAssignedToUser(updatedTask, userEmail)) {
+        const next = prev.filter(task => (task.taskId || task.id) !== updatedTaskId);
+        if (next.length !== prev.length) {
+          setStats(computeStats(next));
+        }
+        return next;
+      }
       const index = prev.findIndex(task => (task.taskId || task.id) === updatedTaskId);
       if (index === -1) {
         return prev;
@@ -120,7 +140,6 @@ const Dashboard = () => {
     // Check if task was just created
     const taskCreated = sessionStorage.getItem('taskCreatedSuccess');
     if (taskCreated === 'true') {
-      setShowSuccessModal(true);
       sessionStorage.removeItem('taskCreatedSuccess');
     }
     
@@ -166,6 +185,15 @@ const Dashboard = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (isAdmin() || !userEmail) return;
+    setTasks(prev => {
+      const next = prev.filter(task => isTaskAssignedToUser(task, userEmail));
+      setStats(computeStats(next));
+      return next;
+    });
+  }, [userEmail]);
+
   const loadTasks = async () => {
     try {
       console.log('Dashboard: Loading tasks...');
@@ -178,7 +206,10 @@ const Dashboard = () => {
         : taskList.filter(task => !deletedTaskIds.includes(task.taskId || task.id));
       console.log('Dashboard: Loaded tasks:', taskList.length);
       const mergedTaskList = mergeUpdatedTasks(filteredTaskList);
-      applyTasks(mergedTaskList);
+      const visibleTasks = isAdmin() || !userEmail
+        ? mergedTaskList
+        : mergedTaskList.filter(task => isTaskAssignedToUser(task, userEmail));
+      applyTasks(visibleTasks);
 
       if (deletedTaskIds.length > 0) {
         const remainingDeletedIds = deletedTaskIds.filter(id =>
@@ -338,12 +369,6 @@ const Dashboard = () => {
         </div>
       )}
       
-      {showSuccessModal && (
-        <SuccessModal
-          message="Task created successfully!"
-          onClose={() => setShowSuccessModal(false)}
-        />
-      )}
     </div>
   );
 };

@@ -2,7 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const { getItem, putItem, query, batchPutItems } = require('../utils/dynamodb');
 const { getUserFromEvent, requireAdmin } = require('../utils/auth');
 const { successResponse, errorResponse } = require('../utils/response');
-const { sendTaskAssignmentNotification } = require('../utils/notifications');
+const { sendTaskAssignmentNotification, getUserEmail } = require('../utils/notifications');
 const { validateEnvVars, validateUUID } = require('../utils/validation');
 const { createLogger } = require('../utils/logger');
 const { CognitoIdentityProviderClient, AdminGetUserCommand } = require('@aws-sdk/client-cognito-identity-provider');
@@ -10,7 +10,26 @@ const { CognitoIdentityProviderClient, AdminGetUserCommand } = require('@aws-sdk
 const cognitoClient = new CognitoIdentityProviderClient({ region: process.env.AWS_REGION || 'eu-west-1' });
 
 // Validate environment variables on cold start
-validateEnvVars(['TASKS_TABLE', 'ASSIGNMENTS_TABLE']);
+validateEnvVars(['TASKS_TABLE', 'ASSIGNMENTS_TABLE', 'USER_POOL_ID']);
+
+const getUserDetails = async (userId) => {
+  const command = new AdminGetUserCommand({
+    UserPoolId: process.env.USER_POOL_ID,
+    Username: userId
+  });
+
+  const response = await cognitoClient.send(command);
+  const attributes = response.UserAttributes || [];
+  const email = attributes.find(attr => attr.Name === 'email')?.Value || null;
+  const name = attributes.find(attr => attr.Name === 'name')?.Value || null;
+  return {
+    userId,
+    enabled: response.Enabled !== false,
+    status: response.UserStatus,
+    email,
+    name
+  };
+};
 
 exports.handler = async (event) => {
   const startTime = Date.now();
@@ -85,17 +104,37 @@ exports.handler = async (event) => {
     }
     
     // Validate that all users exist and are enabled in Cognito
-    // Note: userIds should be Cognito sub IDs. In production, consider:
-    // 1. Accepting emails and looking up subs, or
-    // 2. Maintaining a user cache in DynamoDB with sub->email->status mapping
-    // For now, we proceed with assignment (notifications will fail for invalid users)
     logger.info('Assigning task to users', { taskId, newUserCount: newUserIds.length });
+
+    const userDetails = await Promise.all(
+      newUserIds.map(async (userId) => {
+        try {
+          return await getUserDetails(userId);
+        } catch (error) {
+          return { userId, enabled: false, status: 'UNKNOWN', email: null, name: null };
+        }
+      })
+    );
+
+    const invalidUsers = userDetails
+      .filter(detail => !detail.enabled || detail.status !== 'CONFIRMED' || !detail.email)
+      .map(detail => detail.userId);
+
+    if (invalidUsers.length > 0) {
+      logger.warn('Invalid users for assignment', { taskId, invalidUsers });
+      return errorResponse(
+        `Cannot assign task to disabled, unconfirmed, or missing users: ${invalidUsers.join(', ')}`,
+        400
+      );
+    }
     
     // Create assignments
-    const assignments = newUserIds.map(userId => ({
+    const assignments = userDetails.map(detail => ({
       assignmentId: uuidv4(),
       taskId,
-      userId,
+      userId: detail.userId,
+      userEmail: detail.email,
+      userName: detail.name,
       assignedBy: user.userId,
       assignedAt: new Date().toISOString()
     }));
@@ -105,30 +144,32 @@ exports.handler = async (event) => {
     await batchPutItems(process.env.ASSIGNMENTS_TABLE, assignments);
     
     // Update task's assignedUsers array
-    const allAssignedUserIds = [...existingUserIds, ...newUserIds];
-    task.assignedUsers = allAssignedUserIds;
+    const existingUserEmails = (await Promise.all(
+      existingAssignments.map(a => a.userEmail || getUserEmail(a.userId))
+    )).filter(Boolean);
+    const newUserEmails = userDetails.map(detail => detail.email).filter(Boolean);
+    const allAssignedUserEmails = [...new Set([...existingUserEmails, ...newUserEmails])];
+    task.assignedUsers = allAssignedUserEmails;
     task.updatedAt = new Date().toISOString();
     task.updatedBy = user.userId;
     
     await putItem(process.env.TASKS_TABLE, task);
     
-    // Send notifications to newly assigned users (async, don't wait)
-    sendTaskAssignmentNotification(task, newUserIds).catch(err => 
-      logger.warn('Failed to send notifications', { error: err.message })
-    );
+    // Send notifications to newly assigned users
+    await sendTaskAssignmentNotification(task, newUserIds);
     
     logger.logInvocationEnd(200, Date.now() - startTime);
     logger.info('Task assigned successfully', { 
       taskId, 
       newUsers: newUserIds.length, 
-      totalUsers: allAssignedUserIds.length 
+      totalUsers: allAssignedUserEmails.length 
     });
     
     return successResponse({
       message: 'Task assigned successfully',
       taskId,
       newAssignments: assignments.length,
-      totalAssignedUsers: allAssignedUserIds.length
+      totalAssignedUsers: allAssignedUserEmails.length
     });
     
   } catch (error) {

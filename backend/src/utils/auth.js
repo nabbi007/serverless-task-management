@@ -35,6 +35,10 @@ const canAccessTask = (user, task) => {
   }
   
   // Members can only access tasks assigned to them
+  if (task.assignedTo && (task.assignedTo === user.userId || task.assignedTo === user.email)) {
+    return true;
+  }
+
   if (!task.assignedUsers || task.assignedUsers.length === 0) {
     return false;
   }
@@ -42,9 +46,9 @@ const canAccessTask = (user, task) => {
   // Handle both array of strings and array of objects
   return task.assignedUsers.some(assignedUser => {
     if (typeof assignedUser === 'string') {
-      return assignedUser === user.userId;
+      return assignedUser === user.userId || assignedUser === user.email;
     }
-    return assignedUser.userId === user.userId;
+    return assignedUser.userId === user.userId || assignedUser.userEmail === user.email;
   });
 };
 
@@ -54,6 +58,10 @@ const canUpdateTask = (user, task) => {
   }
   
   // Members can update tasks assigned to them
+  if (task.assignedTo && (task.assignedTo === user.userId || task.assignedTo === user.email)) {
+    return true;
+  }
+
   if (!task.assignedUsers || task.assignedUsers.length === 0) {
     return false;
   }
@@ -61,9 +69,9 @@ const canUpdateTask = (user, task) => {
   // Handle both array of strings and array of objects
   return task.assignedUsers.some(assignedUser => {
     if (typeof assignedUser === 'string') {
-      return assignedUser === user.userId;
+      return assignedUser === user.userId || assignedUser === user.email;
     }
-    return assignedUser.userId === user.userId;
+    return assignedUser.userId === user.userId || assignedUser.userEmail === user.email;
   });
 };
 

@@ -92,7 +92,8 @@ resource "aws_iam_role_policy" "lambda_cognito" {
       Action = [
         "cognito-idp:AdminGetUser",
         "cognito-idp:ListUsers",
-        "cognito-idp:AdminListGroupsForUser"
+        "cognito-idp:AdminListGroupsForUser",
+        "cognito-idp:ListUsersInGroup"
       ]
       Resource = "*"
     }]

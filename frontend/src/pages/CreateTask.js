@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { taskAPI } from '../services/api';
+import AppModal from '../components/AppModal';
 
 const CreateTask = () => {
   const navigate = useNavigate();
@@ -15,6 +16,15 @@ const CreateTask = () => {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    title: '',
+    message: '',
+    variant: 'success',
+    autoClose: true,
+    autoCloseDelay: 1800,
+    onClose: null
+  });
 
   useEffect(() => {
     loadUsers();
@@ -55,11 +65,17 @@ const CreateTask = () => {
       console.log('Creating task with data:', cleanedData);
       const response = await taskAPI.createTask(cleanedData);
       console.log('Task created response:', response);
-      
-      // Store success flag and redirect to dashboard
-      sessionStorage.setItem('taskCreatedSuccess', 'true');
+
       window.dispatchEvent(new Event('taskUpdated'));
-      navigate('/');
+      setModalConfig({
+        title: 'Task created',
+        message: 'Your task has been created successfully.',
+        variant: 'success',
+        autoClose: true,
+        autoCloseDelay: 1800,
+        onClose: () => navigate('/')
+      });
+      setShowModal(true);
     } catch (error) {
       console.error('Error creating task:', error);
       console.error('Error response:', error.response?.data);
@@ -186,6 +202,21 @@ const CreateTask = () => {
           </button>
         </div>
       </form>
+
+      <AppModal
+        open={showModal}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        variant={modalConfig.variant}
+        autoClose={modalConfig.autoClose}
+        autoCloseDelay={modalConfig.autoCloseDelay}
+        onClose={() => {
+          setShowModal(false);
+          if (modalConfig.onClose) {
+            modalConfig.onClose();
+          }
+        }}
+      />
     </div>
   );
 };

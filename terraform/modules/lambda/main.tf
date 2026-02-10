@@ -15,6 +15,7 @@ resource "aws_lambda_function" "create_task" {
       TASKS_TABLE       = var.tasks_table_name
       ASSIGNMENTS_TABLE = var.assignments_table_name
       USER_POOL_ID      = var.cognito_user_pool_id
+      SES_FROM_EMAIL    = var.ses_from_email
     }
   }
   
@@ -39,6 +40,7 @@ resource "aws_lambda_function" "get_tasks" {
     variables = {
       TASKS_TABLE       = var.tasks_table_name
       ASSIGNMENTS_TABLE = var.assignments_table_name
+      USER_POOL_ID      = var.cognito_user_pool_id
     }
   }
   
@@ -63,6 +65,7 @@ resource "aws_lambda_function" "get_task" {
     variables = {
       TASKS_TABLE       = var.tasks_table_name
       ASSIGNMENTS_TABLE = var.assignments_table_name
+      USER_POOL_ID      = var.cognito_user_pool_id
     }
   }
   
@@ -88,6 +91,7 @@ resource "aws_lambda_function" "update_task" {
       TASKS_TABLE       = var.tasks_table_name
       ASSIGNMENTS_TABLE = var.assignments_table_name
       USER_POOL_ID      = var.cognito_user_pool_id
+      SES_FROM_EMAIL    = var.ses_from_email
     }
   }
   
@@ -137,6 +141,7 @@ resource "aws_lambda_function" "assign_task" {
       TASKS_TABLE       = var.tasks_table_name
       ASSIGNMENTS_TABLE = var.assignments_table_name
       USER_POOL_ID      = var.cognito_user_pool_id
+      SES_FROM_EMAIL    = var.ses_from_email
     }
   }
   

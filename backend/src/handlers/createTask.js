@@ -2,11 +2,37 @@ const { v4: uuidv4 } = require('uuid');
 const { putItem } = require('../utils/dynamodb');
 const { getUserFromEvent, requireAdmin } = require('../utils/auth');
 const { successResponse, errorResponse } = require('../utils/response');
+const { sendTaskAssignmentNotification } = require('../utils/notifications');
 const { validateEnvVars, validateRequiredFields, validatePriority, sanitizeString } = require('../utils/validation');
 const { createLogger } = require('../utils/logger');
+const { CognitoIdentityProviderClient, ListUsersCommand } = require('@aws-sdk/client-cognito-identity-provider');
 
 // Validate environment variables on cold start
-validateEnvVars(['TASKS_TABLE']);
+validateEnvVars(['TASKS_TABLE', 'ASSIGNMENTS_TABLE', 'USER_POOL_ID']);
+
+const cognitoClient = new CognitoIdentityProviderClient({ region: process.env.AWS_REGION || 'eu-west-1' });
+
+const getUserByEmail = async (email) => {
+  if (!email) return null;
+
+  const command = new ListUsersCommand({
+    UserPoolId: process.env.USER_POOL_ID,
+    Filter: `email = "${email}"`
+  });
+
+  const response = await cognitoClient.send(command);
+  const user = response.Users?.[0];
+  if (!user) return null;
+  const attributes = user.Attributes || [];
+  const name = attributes.find(attr => attr.Name === 'name')?.Value || null;
+  return {
+    userId: user.Username,
+    enabled: user.Enabled !== false,
+    status: user.UserStatus,
+    email,
+    name
+  };
+};
 
 exports.handler = async (event) => {
   const startTime = Date.now();
@@ -75,6 +101,37 @@ exports.handler = async (event) => {
     
     // Save to DynamoDB
     await putItem(process.env.TASKS_TABLE, task);
+
+    // If assignedTo provided, create assignment record and notify
+    if (assignedTo) {
+      try {
+        const assignedUser = await getUserByEmail(assignedTo);
+        if (assignedUser && assignedUser.enabled && assignedUser.status === 'CONFIRMED') {
+          const assignment = {
+            assignmentId: uuidv4(),
+            taskId: task.taskId,
+            userId: assignedUser.userId,
+            userEmail: assignedUser.email,
+            userName: assignedUser.name,
+            assignedBy: user.userId,
+            assignedAt: new Date().toISOString()
+          };
+
+          await putItem(process.env.ASSIGNMENTS_TABLE, assignment);
+
+          task.assignedUsers = [assignedUser.email];
+          await putItem(process.env.TASKS_TABLE, task);
+
+          await sendTaskAssignmentNotification(task, [assignedUser.userId]);
+        } else if (assignedUser) {
+          logger.warn('Assigned user is disabled or unconfirmed', { assignedTo });
+        } else {
+          logger.warn('Assigned user not found by email', { assignedTo });
+        }
+      } catch (assignmentError) {
+        logger.warn('Failed to create assignment on task creation', { error: assignmentError.message });
+      }
+    }
     
     logger.logInvocationEnd(201, Date.now() - startTime);
     logger.info('Task created successfully', { taskId: task.taskId, createdBy: user.email });

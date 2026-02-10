@@ -76,6 +76,7 @@ module "lambda" {
   cognito_user_pool_id      = module.cognito.user_pool_id
   lambda_layer_arn          = module.lambda_layer.layer_arn
   aws_region                = var.aws_region
+  ses_from_email            = var.ses_from_email
 }
 
 # API Gateway

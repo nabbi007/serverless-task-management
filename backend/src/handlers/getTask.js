@@ -1,10 +1,11 @@
 const { getItem, query } = require('../utils/dynamodb');
-const { getUserFromEvent, isAdmin } = require('../utils/auth');
+const { getUserFromEvent, isAdmin, canAccessTask } = require('../utils/auth');
 const { successResponse, errorResponse } = require('../utils/response');
+const { getUserEmail } = require('../utils/notifications');
 const { validateEnvVars } = require('../utils/validation');
 
 // Validate environment variables on cold start
-validateEnvVars(['TASKS_TABLE', 'ASSIGNMENTS_TABLE']);
+validateEnvVars(['TASKS_TABLE', 'ASSIGNMENTS_TABLE', 'USER_POOL_ID']);
 
 exports.handler = async (event) => {
   const startTime = Date.now();
@@ -35,8 +36,7 @@ exports.handler = async (event) => {
       return errorResponse('Task not found', 404);
     }
     
-    // All authenticated users can view tasks
-    // Update/Delete permissions are checked in those handlers
+    // All authenticated users can view tasks if they have access
     
     // Get all assignments for this task
     let assignedUsers = [];
@@ -47,21 +47,36 @@ exports.handler = async (event) => {
         { ':taskId': taskId },
         'TaskIndex'
       );
-      assignedUsers = assignmentsResult.items.map(a => ({
-        userId: a.userId,
-        userName: a.userName,
-        userEmail: a.userEmail,
-        assignedAt: a.assignedAt
-      }));
+      assignedUsers = await Promise.all(
+        assignmentsResult.items.map(async (assignment) => ({
+          userId: assignment.userId,
+          userName: assignment.userName,
+          userEmail: assignment.userEmail || await getUserEmail(assignment.userId),
+          assignedAt: assignment.assignedAt
+        }))
+      );
     } catch (assignmentError) {
       console.error('Error fetching assignments for task:', assignmentError);
       // Continue without assignments if query fails
+    }
+
+    if (assignedUsers.length === 0 && task.assignedTo) {
+      assignedUsers = [{
+        userId: null,
+        userName: null,
+        userEmail: task.assignedTo,
+        assignedAt: null
+      }];
     }
     
     const taskWithAssignments = {
       ...task,
       assignedUsers: assignedUsers
     };
+
+    if (!isAdmin(user) && !canAccessTask(user, taskWithAssignments)) {
+      return errorResponse('Access denied', 403);
+    }
     
     const duration = Date.now() - startTime;
     console.log('Task fetched successfully', { 
@@ -69,7 +84,7 @@ exports.handler = async (event) => {
       duration: `${duration}ms` 
     });
     
-    return successResponse(taskWithAssignments, 200, true); // Cacheable
+    return successResponse(taskWithAssignments, 200, false);
     
   } catch (error) {
     console.error('Error fetching task:', error);

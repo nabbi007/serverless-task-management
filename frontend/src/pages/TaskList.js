@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 const TaskList = () => {
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, userEmail } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,12 +41,31 @@ const TaskList = () => {
     sessionStorage.setItem(UPDATED_TASKS_KEY, JSON.stringify(updates));
   };
 
+  const isTaskAssignedToUser = (task, email) => {
+    if (!email || !task) return false;
+    if (task.assignedTo && task.assignedTo === email) return true;
+    if (!task.assignedUsers || task.assignedUsers.length === 0) return false;
+
+    return task.assignedUsers.some(assignedUser => {
+      if (typeof assignedUser === 'string') {
+        return assignedUser === email;
+      }
+      return assignedUser.userEmail === email || assignedUser.userId === email;
+    });
+  };
+
   const applyTaskUpdate = (updatedTask) => {
     const updatedTaskId = updatedTask?.taskId || updatedTask?.id;
     if (!updatedTaskId) return false;
     if (getDeletedTaskIds().includes(updatedTaskId)) return true;
     let found = false;
     setTasks(prev => {
+      const shouldFilter = !isAdmin() && userEmail;
+      const hasAssignmentInfo = updatedTask.assignedUsers || updatedTask.assignedTo;
+      if (shouldFilter && hasAssignmentInfo && !isTaskAssignedToUser(updatedTask, userEmail)) {
+        const next = prev.filter(task => (task.taskId || task.id) !== updatedTaskId);
+        return next;
+      }
       const index = prev.findIndex(task => (task.taskId || task.id) === updatedTaskId);
       if (index === -1) {
         return prev;
@@ -138,6 +157,11 @@ const TaskList = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (isAdmin() || !userEmail) return;
+    setTasks(prev => prev.filter(task => isTaskAssignedToUser(task, userEmail)));
+  }, [userEmail]);
+
   const loadTasks = async () => {
     try {
       const response = await taskAPI.getTasks();
@@ -147,7 +171,10 @@ const TaskList = () => {
         ? taskList
         : taskList.filter(task => !deletedTaskIds.includes(task.taskId || task.id));
       const mergedTaskList = mergeUpdatedTasks(filteredTaskList);
-      setTasks(mergedTaskList);
+      const visibleTasks = isAdmin() || !userEmail
+        ? mergedTaskList
+        : mergedTaskList.filter(task => isTaskAssignedToUser(task, userEmail));
+      setTasks(visibleTasks);
 
       if (deletedTaskIds.length > 0) {
         const remainingDeletedIds = deletedTaskIds.filter(id =>

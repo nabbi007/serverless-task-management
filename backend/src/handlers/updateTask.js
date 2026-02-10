@@ -1,7 +1,7 @@
 const { getItem, updateItem, query } = require('../utils/dynamodb');
-const { getUserFromEvent, canUpdateTask } = require('../utils/auth');
+const { getUserFromEvent, canUpdateTask, isAdmin } = require('../utils/auth');
 const { successResponse, errorResponse } = require('../utils/response');
-const { sendTaskStatusChangeNotification } = require('../utils/notifications');
+const { sendTaskStatusChangeNotification, listAdminUserIds } = require('../utils/notifications');
 const { validateEnvVars, validateUUID, validateStatus, validatePriority, sanitizeString } = require('../utils/validation');
 const { createLogger } = require('../utils/logger');
 
@@ -39,6 +39,24 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body);
     const { title, description, status, priority, dueDate, timeEstimate, assignedTo } = body;
     
+    const admin = isAdmin(user);
+
+    // Members can only update status
+    if (!admin) {
+      const hasNonStatusUpdate = [
+        title,
+        description,
+        priority,
+        dueDate,
+        timeEstimate,
+        assignedTo
+      ].some(value => value !== undefined);
+
+      if (hasNonStatusUpdate) {
+        return errorResponse('Only admins can update task fields other than status', 403);
+      }
+    }
+
     // Validate enums if provided
     if (status && !validateStatus(status)) {
       return errorResponse('Invalid status value. Must be: open, in-progress, completed, or closed', 400);
@@ -158,20 +176,21 @@ exports.handler = async (event) => {
         'TaskIndex'
       );
       
-      const assignedUserIds = assignmentResult.items ? 
-        assignmentResult.items.map(a => a.userId) : 
+      const assignedUserIds = assignmentResult.items ?
+        assignmentResult.items.map(a => a.userId) :
         assignmentResult.map(a => a.userId);
-      
-      // Add task creator to notification list
-      if (!assignedUserIds.includes(existingTask.createdBy)) {
-        assignedUserIds.push(existingTask.createdBy);
+
+      const adminUserIds = await listAdminUserIds();
+      const recipients = new Set([...assignedUserIds, ...adminUserIds]);
+      if (!admin) {
+        recipients.delete(user.userId);
       }
       
       await sendTaskStatusChangeNotification(
         updatedTask,
         existingTask.status,
         status,
-        assignedUserIds
+        Array.from(recipients)
       );
     }
     

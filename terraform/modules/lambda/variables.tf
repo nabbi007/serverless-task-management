@@ -39,3 +39,9 @@ variable "aws_region" {
   type        = string
   default     = "eu-west-1"
 }
+
+variable "ses_from_email" {
+  description = "Verified SES From email address used for notifications"
+  type        = string
+  default     = ""
+}

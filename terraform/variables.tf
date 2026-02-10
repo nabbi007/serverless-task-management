@@ -19,7 +19,7 @@ variable "project_name" {
 variable "allowed_email_domains" {
   description = "Allowed email domains for signup"
   type        = list(string)
-  default     = ["amalitech.com", "amalitechtraining.org"]
+  default     = ["amalitech.com", "amalitechtraining.org", "gmail.com"]
 }
 
 variable "cognito_callback_urls" {
@@ -32,5 +32,17 @@ variable "cognito_logout_urls" {
   description = "Cognito logout URLs"
   type        = list(string)
   default     = ["http://localhost:3000/"]
+}
+
+variable "ses_from_email" {
+  description = "Verified SES From email address used for notifications"
+  type        = string
+  default     = ""
+}
+
+variable "ses_verified_recipient_emails" {
+  description = "Recipient emails to verify in SES (needed for sandbox sending)"
+  type        = list(string)
+  default     = []
 }
 

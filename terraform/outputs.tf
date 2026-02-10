@@ -28,3 +28,8 @@ output "lambda_layer_arn" {
   value       = module.lambda_layer.layer_arn
 }
 
+output "ses_from_email_identity_arn" {
+  description = "SES identity ARN for the from email (if configured)"
+  value       = length(aws_ses_email_identity.from) > 0 ? aws_ses_email_identity.from[0].arn : null
+}
+

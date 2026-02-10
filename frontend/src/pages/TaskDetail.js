@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { taskAPI } from '../services/api';
 import { Edit2, Users, Trash2 } from 'lucide-react';
+import AppModal from '../components/AppModal';
 
 const TaskDetail = () => {
   const { id } = useParams();
@@ -16,6 +17,18 @@ const TaskDetail = () => {
   const [users, setUsers] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [assigningUsers, setAssigningUsers] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    title: '',
+    message: '',
+    variant: 'success',
+    autoClose: true,
+    autoCloseDelay: 1800,
+    onClose: null,
+    primaryAction: null,
+    secondaryAction: null
+  });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const UPDATED_TASKS_KEY = 'updatedTasks';
 
   const normalizeTask = (taskData) => {
@@ -87,6 +100,21 @@ const TaskDetail = () => {
     window.dispatchEvent(new Event('taskUpdated'));
   };
 
+  const openModal = (config) => {
+    setModalConfig(prev => ({
+      ...prev,
+      title: config.title || prev.title,
+      message: config.message || '',
+      variant: config.variant || 'success',
+      autoClose: config.autoClose ?? true,
+      autoCloseDelay: config.autoCloseDelay ?? 1800,
+      onClose: config.onClose || null,
+      primaryAction: config.primaryAction || null,
+      secondaryAction: config.secondaryAction || null
+    }));
+    setShowModal(true);
+  };
+
   useEffect(() => {
     loadTask();
     if (isAdmin()) {
@@ -135,12 +163,21 @@ const TaskDetail = () => {
   const handleUpdate = async (e) => {
     e.preventDefault();
     try {
-      const response = await taskAPI.updateTask(id, formData);
+      const updatePayload = isAdmin()
+        ? formData
+        : { status: formData.status };
+      const response = await taskAPI.updateTask(id, updatePayload);
       const updatedFromResponse = normalizeTask(response?.data?.task || response?.data || response?.task);
-      alert('Task updated successfully');
+      openModal({
+        title: 'Task updated',
+        message: 'Your changes have been saved.',
+        variant: 'success',
+        autoClose: true,
+        autoCloseDelay: 1600
+      });
       setEditing(false);
       const refreshedTask = await loadTask(); // Reload task to get updated data
-      const fallbackTask = normalizeTask({ ...task, ...formData });
+      const fallbackTask = normalizeTask({ ...task, ...updatePayload });
       const finalTask = refreshedTask || updatedFromResponse || fallbackTask;
       // Trigger a refresh event for dashboard
       emitTaskUpdated(finalTask);
@@ -181,8 +218,10 @@ const TaskDetail = () => {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this task?')) return;
-    
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
     try {
       await taskAPI.deleteTask(id);
       // Set flag for dashboard to reload
@@ -192,10 +231,19 @@ const TaskDetail = () => {
       rememberDeletedTaskId(id);
       removeUpdatedTask(id);
       emitTaskDeleted(id);
-      navigate('/', { replace: true });
+      openModal({
+        title: 'Task deleted',
+        message: 'The task has been deleted successfully.',
+        variant: 'success',
+        autoClose: true,
+        autoCloseDelay: 1600,
+        onClose: () => navigate('/', { replace: true })
+      });
     } catch (error) {
       console.error('Error deleting task:', error);
       alert('Failed to delete task: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -230,7 +278,7 @@ const TaskDetail = () => {
             <>
               {canEditTask() && (
                 <button onClick={() => setEditing(true)} className="btn btn-secondary">
-                  <Edit2 size={18} /> Edit
+                  <Edit2 size={18} /> {isAdmin() ? 'Edit' : 'Update Status'}
                 </button>
               )}
               {isAdmin() && (
@@ -250,27 +298,65 @@ const TaskDetail = () => {
 
       {editing ? (
         <form onSubmit={handleUpdate} className="task-form">
-          <div className="form-group">
-            <label>Title</label>
-            <input
-              type="text"
-              value={formData.title || ''}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              required
-            />
-          </div>
+          {isAdmin() ? (
+            <>
+              <div className="form-group">
+                <label>Title</label>
+                <input
+                  type="text"
+                  value={formData.title || ''}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  required
+                />
+              </div>
 
-          <div className="form-group">
-            <label>Description</label>
-            <textarea
-              value={formData.description || ''}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              rows="4"
-              required
-            />
-          </div>
+              <div className="form-group">
+                <label>Description</label>
+                <textarea
+                  value={formData.description || ''}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows="4"
+                  required
+                />
+              </div>
 
-          <div className="form-row">
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Status</label>
+                  <select
+                    value={formData.status || 'open'}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  >
+                    <option value="open">Open</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label>Priority</label>
+                  <select
+                    value={formData.priority || 'medium'}
+                    onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Due Date</label>
+                <input
+                  type="date"
+                  value={formData.dueDate || ''}
+                  onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                />
+              </div>
+            </>
+          ) : (
             <div className="form-group">
               <label>Status</label>
               <select
@@ -283,28 +369,7 @@ const TaskDetail = () => {
                 <option value="closed">Closed</option>
               </select>
             </div>
-
-            <div className="form-group">
-              <label>Priority</label>
-              <select
-                value={formData.priority || 'medium'}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label>Due Date</label>
-            <input
-              type="date"
-              value={formData.dueDate || ''}
-              onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-            />
-          </div>
+          )}
 
           <div className="form-actions">
             <button type="submit" className="btn btn-primary">
@@ -373,12 +438,21 @@ const TaskDetail = () => {
               <div className="assigned-users-list">
                 {task.assignedUsers.map((user, index) => (
                   <div key={index} className="assigned-user-card">
-                    <div className="user-avatar">{user.userEmail?.substring(0, 2).toUpperCase() || '??'}</div>
+                    <div className="user-avatar">
+                      {(typeof user === 'string'
+                        ? user
+                        : (user.userEmail || user.userId || '')
+                      ).substring(0, 2).toUpperCase() || '??'}
+                    </div>
                     <div className="user-info">
-                      <div className="user-email">{user.userEmail || user.userId}</div>
-                      <div className="user-assigned-date">
-                        Assigned {new Date(user.assignedAt).toLocaleDateString()}
+                      <div className="user-email">
+                        {typeof user === 'string' ? user : (user.userEmail || user.userId)}
                       </div>
+                      {user.assignedAt && (
+                        <div className="user-assigned-date">
+                          Assigned {new Date(user.assignedAt).toLocaleDateString()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -436,6 +510,33 @@ const TaskDetail = () => {
           </div>
         </div>
       )}
+
+      <AppModal
+        open={showModal}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        variant={modalConfig.variant}
+        autoClose={modalConfig.autoClose}
+        autoCloseDelay={modalConfig.autoCloseDelay}
+        primaryAction={modalConfig.primaryAction}
+        secondaryAction={modalConfig.secondaryAction}
+        onClose={() => {
+          setShowModal(false);
+          if (modalConfig.onClose) {
+            modalConfig.onClose();
+          }
+        }}
+      />
+
+      <AppModal
+        open={showDeleteConfirm}
+        title="Delete task?"
+        message="This action cannot be undone. The task will be permanently removed."
+        variant="danger"
+        primaryAction={{ label: 'Delete task', onClick: confirmDelete }}
+        secondaryAction={{ label: 'Cancel', onClick: () => setShowDeleteConfirm(false) }}
+        onClose={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 };
