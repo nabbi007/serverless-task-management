@@ -4,13 +4,28 @@ const getUserFromEvent = (event) => {
   if (!claims) {
     throw new Error('No authorization claims found');
   }
+
+  const cognitoUsername = claims['cognito:username'];
+  const sub = claims.sub;
+  const email = claims.email;
   
   return {
-    userId: claims.sub,
-    email: claims.email,
+    // Use Cognito username for data consistency (assignments store Username).
+    userId: cognitoUsername || sub,
+    cognitoUsername: cognitoUsername || null,
+    sub: sub || null,
+    email,
     role: claims['custom:role'] || 'member',
     groups: claims['cognito:groups'] ? claims['cognito:groups'].split(',') : []
   };
+};
+
+const userIdentityMatches = (candidate, user) => {
+  if (!candidate || !user) return false;
+  return candidate === user.userId ||
+    candidate === user.cognitoUsername ||
+    candidate === user.sub ||
+    candidate === user.email;
 };
 
 const isAdmin = (user) => {
@@ -35,7 +50,7 @@ const canAccessTask = (user, task) => {
   }
   
   // Members can only access tasks assigned to them
-  if (task.assignedTo && (task.assignedTo === user.userId || task.assignedTo === user.email)) {
+  if (task.assignedTo && userIdentityMatches(task.assignedTo, user)) {
     return true;
   }
 
@@ -46,9 +61,9 @@ const canAccessTask = (user, task) => {
   // Handle both array of strings and array of objects
   return task.assignedUsers.some(assignedUser => {
     if (typeof assignedUser === 'string') {
-      return assignedUser === user.userId || assignedUser === user.email;
+      return userIdentityMatches(assignedUser, user);
     }
-    return assignedUser.userId === user.userId || assignedUser.userEmail === user.email;
+    return userIdentityMatches(assignedUser.userId, user) || userIdentityMatches(assignedUser.userEmail, user);
   });
 };
 
@@ -58,7 +73,7 @@ const canUpdateTask = (user, task) => {
   }
   
   // Members can update tasks assigned to them
-  if (task.assignedTo && (task.assignedTo === user.userId || task.assignedTo === user.email)) {
+  if (task.assignedTo && userIdentityMatches(task.assignedTo, user)) {
     return true;
   }
 
@@ -69,9 +84,9 @@ const canUpdateTask = (user, task) => {
   // Handle both array of strings and array of objects
   return task.assignedUsers.some(assignedUser => {
     if (typeof assignedUser === 'string') {
-      return assignedUser === user.userId || assignedUser === user.email;
+      return userIdentityMatches(assignedUser, user);
     }
-    return assignedUser.userId === user.userId || assignedUser.userEmail === user.email;
+    return userIdentityMatches(assignedUser.userId, user) || userIdentityMatches(assignedUser.userEmail, user);
   });
 };
 

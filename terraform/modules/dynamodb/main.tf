@@ -2,6 +2,8 @@ resource "aws_dynamodb_table" "tasks" {
   name           = "${var.project_name}-${var.environment}-tasks"
   billing_mode   = "PAY_PER_REQUEST"
   hash_key       = "taskId"
+  stream_enabled = true
+  stream_view_type = "NEW_AND_OLD_IMAGES"
   
   attribute {
     name = "taskId"
@@ -51,6 +53,8 @@ resource "aws_dynamodb_table" "assignments" {
   name           = "${var.project_name}-${var.environment}-assignments"
   billing_mode   = "PAY_PER_REQUEST"
   hash_key       = "assignmentId"
+  stream_enabled = true
+  stream_view_type = "NEW_AND_OLD_IMAGES"
   
   attribute {
     name = "assignmentId"

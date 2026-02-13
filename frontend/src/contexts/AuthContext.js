@@ -26,7 +26,7 @@ export const AuthProvider = ({ children, user }) => {
         
         if (token) {
           setIdToken(token.toString());
-          setUserId(token.payload.sub);
+          setUserId(token.payload['cognito:username'] || token.payload.sub);
           setUserEmail(token.payload.email || user?.signInDetails?.loginId || null);
           const groups = token.payload['cognito:groups'] || [];
           const customRole = token.payload['custom:role'];

@@ -37,12 +37,18 @@ variable "cognito_logout_urls" {
 variable "ses_from_email" {
   description = "Verified SES From email address used for notifications"
   type        = string
-  default     = ""
+  default     = "illiasu.abubakar@amalitech.com"
 }
 
 variable "ses_verified_recipient_emails" {
   description = "Recipient emails to verify in SES (needed for sandbox sending)"
   type        = list(string)
-  default     = []
+  default     = ["illiasu.abubakar@amalitech.com"]
+}
+
+variable "ses_domain" {
+  description = "Domain identity to verify in SES (optional, for production-ready sending)"
+  type        = string
+  default     = ""
 }
 

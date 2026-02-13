@@ -57,8 +57,44 @@ resource "aws_iam_role_policy" "lambda_dynamodb" {
           var.assignments_table_arn,
           "${var.assignments_table_arn}/index/*"
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:DescribeStream",
+          "dynamodb:GetRecords",
+          "dynamodb:GetShardIterator"
+        ]
+        Resource = [
+          var.tasks_stream_arn,
+          var.assignments_stream_arn
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "dynamodb:ListStreams"
+        ]
+        Resource = "*"
       }
     ]
+  })
+}
+
+# SNS publish policy
+resource "aws_iam_role_policy" "lambda_sns" {
+  name = "lambda-sns"
+  role = aws_iam_role.lambda_execution.id
+  
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "sns:Publish"
+      ]
+      Resource = var.sns_topic_arns
+    }]
   })
 }
 

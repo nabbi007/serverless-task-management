@@ -32,6 +32,27 @@ const putItem = async (tableName, item) => {
   return item;
 };
 
+const batchPutItems = async (tableName, items) => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return;
+  }
+
+  // Use PutItem calls to avoid requiring BatchWriteItem IAM permissions.
+  const chunkSize = 25;
+  for (let i = 0; i < items.length; i += chunkSize) {
+    const chunk = items.slice(i, i + chunkSize);
+    await Promise.all(
+      chunk.map(item => {
+        const command = new PutCommand({
+          TableName: tableName,
+          Item: item
+        });
+        return docClient.send(command);
+      })
+    );
+  }
+};
+
 const updateItem = async (tableName, key, updateExpression, expressionAttributeValues, expressionAttributeNames = {}) => {
   const params = {
     TableName: tableName,
@@ -138,6 +159,7 @@ const scan = async (tableName, filterExpression = null, expressionAttributeValue
 module.exports = {
   getItem,
   putItem,
+  batchPutItems,
   updateItem,
   deleteItem,
   query,

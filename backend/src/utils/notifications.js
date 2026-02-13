@@ -24,50 +24,6 @@ const getUserEmail = async (userId) => {
   }
 };
 
-const sendTaskAssignmentNotification = async (task, assignedUserIds) => {
-  try {
-    const emails = await Promise.all(
-      assignedUserIds.map(userId => getUserEmail(userId))
-    );
-    
-    const validEmails = emails.filter(email => email !== null);
-    
-    for (const email of validEmails) {
-      await sendEmail(
-        email,
-        'New Task Assignment',
-        `You have been assigned to task: ${task.title}\n\nDescription: ${task.description}\n\nStatus: ${task.status}`
-      );
-    }
-    
-    console.log(`Assignment notifications sent for task ${task.taskId} to ${validEmails.length} users`);
-  } catch (error) {
-    console.error('Error sending assignment notification:', error);
-  }
-};
-
-const sendTaskStatusChangeNotification = async (task, oldStatus, newStatus, assignedUserIds) => {
-  try {
-    const emails = await Promise.all(
-      assignedUserIds.map(userId => getUserEmail(userId))
-    );
-    
-    const validEmails = emails.filter(email => email !== null);
-    
-    for (const email of validEmails) {
-      await sendEmail(
-        email,
-        'Task Status Updated',
-        `Task "${task.title}" status changed from ${oldStatus} to ${newStatus}\n\nDescription: ${task.description}`
-      );
-    }
-    
-    console.log(`Status change notifications sent for task ${task.taskId} to ${validEmails.length} users`);
-  } catch (error) {
-    console.error('Error sending status change notification:', error);
-  }
-};
-
 const listAdminUserIds = async () => {
   try {
     if (!process.env.USER_POOL_ID) {
@@ -78,16 +34,22 @@ const listAdminUserIds = async () => {
     const adminUserIds = new Set();
     let paginationToken = undefined;
 
+    // Cognito ListUsers does not reliably support filtering on custom attributes in all setups.
+    // Read users page by page and evaluate custom:role client-side.
     do {
       const command = new ListUsersCommand({
         UserPoolId: process.env.USER_POOL_ID,
-        Filter: 'custom:role = "admin"',
         PaginationToken: paginationToken
       });
 
       const response = await cognitoClient.send(command);
       const users = response.Users || [];
-      users.forEach(user => adminUserIds.add(user.Username));
+      users.forEach(user => {
+        const role = user.Attributes?.find(attr => attr.Name === 'custom:role')?.Value;
+        if (role === 'admin') {
+          adminUserIds.add(user.Username);
+        }
+      });
       paginationToken = response.PaginationToken;
     } while (paginationToken);
 
@@ -144,8 +106,6 @@ const sendEmail = async (to, subject, body) => {
 
 module.exports = {
   getUserEmail,
-  sendTaskAssignmentNotification,
-  sendTaskStatusChangeNotification,
   listAdminUserIds,
   sendEmail
 };

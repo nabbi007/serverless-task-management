@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { taskAPI } from '../services/api';
 import AppModal from '../components/AppModal';
+import MultiMemberSelect from '../components/MultiMemberSelect';
 
 const CreateTask = () => {
   const navigate = useNavigate();
@@ -11,7 +12,7 @@ const CreateTask = () => {
     priority: 'medium',
     dueDate: '',
     timeEstimate: '',
-    assignedTo: ''
+    assignedUserIds: []
   });
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
@@ -59,7 +60,7 @@ const CreateTask = () => {
         priority: formData.priority,
         dueDate: formData.dueDate || null,
         timeEstimate: formData.timeEstimate ? parseFloat(formData.timeEstimate) : null,
-        assignedTo: formData.assignedTo || null
+        assignedUserIds: formData.assignedUserIds
       };
       
       console.log('Creating task with data:', cleanedData);
@@ -95,6 +96,10 @@ const CreateTask = () => {
       [name]: value
     }));
   };
+
+  const assignableUsers = users.filter(
+    user => user.role !== 'admin' && user.enabled !== false && user.status === 'CONFIRMED'
+  );
 
   return (
     <div className="create-task-page">
@@ -156,22 +161,24 @@ const CreateTask = () => {
 
         <div className="form-row">
           <div className="form-group">
-            <label htmlFor="assignedTo">Assigned To</label>
-            <select
-              id="assignedTo"
-              name="assignedTo"
-              value={formData.assignedTo}
-              onChange={handleChange}
-              disabled={loadingUsers}
-            >
-              <option value="">-- Select User --</option>
-              {users.map(user => (
-                <option key={user.userId} value={user.email}>
-                  {user.email}
-                </option>
-              ))}
-            </select>
+            <label>Assign Members</label>
             {loadingUsers && <small>Loading users...</small>}
+            {!loadingUsers && (
+              <>
+                {assignableUsers.length === 0 ? (
+                  <small>No members available for assignment.</small>
+                ) : (
+                  <MultiMemberSelect
+                    users={assignableUsers}
+                    selectedUserIds={formData.assignedUserIds}
+                    onChange={(selectedIds) =>
+                      setFormData((prev) => ({ ...prev, assignedUserIds: selectedIds }))
+                    }
+                    placeholder="Select one or more members"
+                  />
+                )}
+              </>
+            )}
           </div>
 
           <div className="form-group">

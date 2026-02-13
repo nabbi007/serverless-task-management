@@ -1,7 +1,6 @@
 const { getItem, updateItem, query } = require('../utils/dynamodb');
 const { getUserFromEvent, canUpdateTask, isAdmin } = require('../utils/auth');
 const { successResponse, errorResponse } = require('../utils/response');
-const { sendTaskStatusChangeNotification, listAdminUserIds } = require('../utils/notifications');
 const { validateEnvVars, validateUUID, validateStatus, validatePriority, sanitizeString } = require('../utils/validation');
 const { createLogger } = require('../utils/logger');
 
@@ -82,7 +81,25 @@ exports.handler = async (event) => {
     }
     
     // Check if user can update this task
-    if (!canUpdateTask(user, existingTask)) {
+    let canUpdate = canUpdateTask(user, existingTask);
+    if (!canUpdate && !admin) {
+      try {
+        const assignmentCheck = await query(
+          process.env.ASSIGNMENTS_TABLE,
+          'taskId = :taskId',
+          { ':taskId': taskId },
+          'TaskIndex'
+        );
+        const assignmentItems = assignmentCheck.items || assignmentCheck || [];
+        canUpdate = assignmentItems.some(a =>
+          a.userId === user.userId || a.userEmail === user.email
+        );
+      } catch (assignmentError) {
+        logger.warn('Error checking assignments for update access', { error: assignmentError.message });
+      }
+    }
+
+    if (!canUpdate) {
       logger.warn('Access denied', { userId: user.userId, taskId });
       return errorResponse('Access denied', 403);
     }
@@ -159,40 +176,6 @@ exports.handler = async (event) => {
       expressionAttributeValues,
       expressionAttributeNames
     );
-    
-    // Send notifications if status changed
-    if (status && status !== existingTask.status) {
-      logger.info('Status changed, sending notifications', { 
-        taskId, 
-        oldStatus: existingTask.status, 
-        newStatus: status 
-      });
-      
-      // Get all assigned users
-      const assignmentResult = await query(
-        process.env.ASSIGNMENTS_TABLE,
-        'taskId = :taskId',
-        { ':taskId': taskId },
-        'TaskIndex'
-      );
-      
-      const assignedUserIds = assignmentResult.items ?
-        assignmentResult.items.map(a => a.userId) :
-        assignmentResult.map(a => a.userId);
-
-      const adminUserIds = await listAdminUserIds();
-      const recipients = new Set([...assignedUserIds, ...adminUserIds]);
-      if (!admin) {
-        recipients.delete(user.userId);
-      }
-      
-      await sendTaskStatusChangeNotification(
-        updatedTask,
-        existingTask.status,
-        status,
-        Array.from(recipients)
-      );
-    }
     
     logger.logInvocationEnd(200, Date.now() - startTime);
     logger.info('Task updated successfully', { taskId, updatedBy: user.email });

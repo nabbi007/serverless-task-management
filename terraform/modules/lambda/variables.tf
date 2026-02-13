@@ -45,3 +45,13 @@ variable "ses_from_email" {
   type        = string
   default     = ""
 }
+
+variable "sns_task_assigned_topic_arn" {
+  description = "SNS topic ARN for task assignment notifications"
+  type        = string
+}
+
+variable "sns_task_status_topic_arn" {
+  description = "SNS topic ARN for task status change notifications"
+  type        = string
+}

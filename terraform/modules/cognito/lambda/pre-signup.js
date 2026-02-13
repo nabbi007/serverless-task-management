@@ -1,22 +1,36 @@
+const SIGNUP_RESTRICTED_MESSAGE =
+  'Sign up is currently restricted. Please use an approved organization email address or contact support.';
+
 exports.handler = async (event) => {
-  console.log('Pre-signup event:', JSON.stringify(event, null, 2));
-  
-  const allowedDomains = process.env.ALLOWED_DOMAINS.split(',');
-  const email = event.request.userAttributes.email;
-  
-  if (!email) {
-    throw new Error('Email is required');
+  const allowedDomains = (process.env.ALLOWED_DOMAINS || '')
+    .split(',')
+    .map((domain) => domain.trim().toLowerCase())
+    .filter(Boolean);
+
+  const email = (event?.request?.userAttributes?.email || '').trim().toLowerCase();
+  const emailDomain = email.includes('@') ? email.split('@').pop() : '';
+
+  if (!email || !emailDomain) {
+    throw new Error(SIGNUP_RESTRICTED_MESSAGE);
   }
-  
-  const emailDomain = email.split('@')[1];
-  
-  if (!allowedDomains.includes(emailDomain)) {
-    throw new Error(`Email domain ${emailDomain} is not allowed. Only ${allowedDomains.join(', ')} are permitted.`);
+
+  const isAllowed = allowedDomains.includes(emailDomain);
+  if (!isAllowed) {
+    // Keep logs useful for operations without exposing domain policy to end users.
+    console.warn(
+      JSON.stringify({
+        level: 'WARN',
+        message: 'PreSignUp rejected: domain_not_allowed',
+        emailDomain,
+        userPoolId: event.userPoolId,
+        triggerSource: event.triggerSource
+      })
+    );
+    throw new Error(SIGNUP_RESTRICTED_MESSAGE);
   }
-  
-  // Auto-confirm user (optional - remove if you want manual confirmation)
+
   event.response.autoConfirmUser = false;
   event.response.autoVerifyEmail = false;
-  
+
   return event;
 };

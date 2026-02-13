@@ -204,7 +204,69 @@ resource "aws_lambda_function" "get_users" {
   }
 }
 
+# Stream Processor Lambda (DynamoDB Streams -> SNS)
+resource "aws_lambda_function" "stream_processor" {
+  filename         = "${path.root}/lambda-packages/stream-processor.zip"
+  function_name    = "${var.project_name}-${var.environment}-stream-processor"
+  role             = var.lambda_execution_role_arn
+  handler          = "handlers/streamProcessor.handler"
+  runtime          = "nodejs18.x"
+  timeout          = 10
+  memory_size      = 256
+  source_code_hash = filebase64sha256("${path.root}/lambda-packages/stream-processor.zip")
+  layers           = var.lambda_layer_arn != "" ? [var.lambda_layer_arn] : []
+  
+  environment {
+    variables = {
+      TASKS_TABLE_NAME            = var.tasks_table_name
+      ASSIGNMENTS_TABLE_NAME      = var.assignments_table_name
+      SNS_TASK_ASSIGNED_TOPIC_ARN = var.sns_task_assigned_topic_arn
+      SNS_TASK_STATUS_TOPIC_ARN   = var.sns_task_status_topic_arn
+    }
+  }
+  
+  tracing_config {
+    mode = "Active"
+  }
+}
+
+# Email Formatter Lambda (SNS -> SES)
+resource "aws_lambda_function" "email_formatter" {
+  filename         = "${path.root}/lambda-packages/email-formatter.zip"
+  function_name    = "${var.project_name}-${var.environment}-email-formatter"
+  role             = var.lambda_execution_role_arn
+  handler          = "handlers/emailFormatter.handler"
+  runtime          = "nodejs18.x"
+  timeout          = 15
+  memory_size      = 256
+  source_code_hash = filebase64sha256("${path.root}/lambda-packages/email-formatter.zip")
+  layers           = var.lambda_layer_arn != "" ? [var.lambda_layer_arn] : []
+  
+  environment {
+    variables = {
+      TASKS_TABLE       = var.tasks_table_name
+      ASSIGNMENTS_TABLE = var.assignments_table_name
+      USER_POOL_ID      = var.cognito_user_pool_id
+      SES_FROM_EMAIL    = var.ses_from_email
+    }
+  }
+  
+  tracing_config {
+    mode = "Active"
+  }
+}
+
 resource "aws_cloudwatch_log_group" "get_users" {
   name              = "/aws/lambda/${aws_lambda_function.get_users.function_name}"
+  retention_in_days = 14
+}
+
+resource "aws_cloudwatch_log_group" "stream_processor" {
+  name              = "/aws/lambda/${aws_lambda_function.stream_processor.function_name}"
+  retention_in_days = 14
+}
+
+resource "aws_cloudwatch_log_group" "email_formatter" {
+  name              = "/aws/lambda/${aws_lambda_function.email_formatter.function_name}"
   retention_in_days = 14
 }

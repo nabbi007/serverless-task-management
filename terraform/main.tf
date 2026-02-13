@@ -62,6 +62,9 @@ module "iam" {
   environment            = var.environment
   tasks_table_arn        = module.dynamodb.tasks_table_arn
   assignments_table_arn  = module.dynamodb.assignments_table_arn
+  tasks_stream_arn        = module.dynamodb.tasks_stream_arn
+  assignments_stream_arn  = module.dynamodb.assignments_stream_arn
+  sns_topic_arns          = [aws_sns_topic.task_assigned.arn, aws_sns_topic.task_status_changed.arn]
 }
 
 # Lambda Functions
@@ -77,6 +80,8 @@ module "lambda" {
   lambda_layer_arn          = module.lambda_layer.layer_arn
   aws_region                = var.aws_region
   ses_from_email            = var.ses_from_email
+  sns_task_assigned_topic_arn = aws_sns_topic.task_assigned.arn
+  sns_task_status_topic_arn   = aws_sns_topic.task_status_changed.arn
 }
 
 # API Gateway

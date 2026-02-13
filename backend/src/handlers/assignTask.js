@@ -2,7 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const { getItem, putItem, query, batchPutItems } = require('../utils/dynamodb');
 const { getUserFromEvent, requireAdmin } = require('../utils/auth');
 const { successResponse, errorResponse } = require('../utils/response');
-const { sendTaskAssignmentNotification, getUserEmail } = require('../utils/notifications');
+const { getUserEmail } = require('../utils/notifications');
 const { validateEnvVars, validateUUID } = require('../utils/validation');
 const { createLogger } = require('../utils/logger');
 const { CognitoIdentityProviderClient, AdminGetUserCommand } = require('@aws-sdk/client-cognito-identity-provider');
@@ -154,9 +154,6 @@ exports.handler = async (event) => {
     task.updatedBy = user.userId;
     
     await putItem(process.env.TASKS_TABLE, task);
-    
-    // Send notifications to newly assigned users
-    await sendTaskAssignmentNotification(task, newUserIds);
     
     logger.logInvocationEnd(200, Date.now() - startTime);
     logger.info('Task assigned successfully', { 

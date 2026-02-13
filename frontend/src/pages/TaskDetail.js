@@ -4,11 +4,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { taskAPI } from '../services/api';
 import { Edit2, Users, Trash2 } from 'lucide-react';
 import AppModal from '../components/AppModal';
+import MultiMemberSelect from '../components/MultiMemberSelect';
 
 const TaskDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { isAdmin, userId } = useAuth();
+  const { isAdmin, userId, userEmail } = useAuth();
   const [task, setTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -122,6 +123,14 @@ const TaskDetail = () => {
     }
   }, [id]);
 
+  useEffect(() => {
+    if (!showAssignModal) {
+      return;
+    }
+    const alreadyAssigned = getAssignedUserIds(task, users);
+    setSelectedUsers(alreadyAssigned);
+  }, [showAssignModal, task, users]);
+
   const loadUsers = async () => {
     try {
       const response = await taskAPI.getUsers();
@@ -195,8 +204,16 @@ const TaskDetail = () => {
 
     setAssigningUsers(true);
     try {
-      await taskAPI.assignTask(id, selectedUsers);
-      alert(`Task assigned to ${selectedUsers.length} user(s) successfully!`);
+      const alreadyAssigned = new Set(getAssignedUserIds(task, users));
+      const newUserIds = selectedUsers.filter(userId => !alreadyAssigned.has(userId));
+
+      if (newUserIds.length === 0) {
+        alert('All selected users are already assigned to this task.');
+        return;
+      }
+
+      await taskAPI.assignTask(id, newUserIds);
+      alert(`Task assigned to ${newUserIds.length} new user(s) successfully!`);
       setShowAssignModal(false);
       setSelectedUsers([]);
       const refreshedTask = await loadTask();
@@ -209,13 +226,48 @@ const TaskDetail = () => {
     }
   };
 
-  const toggleUserSelection = (userId) => {
-    setSelectedUsers(prev => 
-      prev.includes(userId) 
-        ? prev.filter(id => id !== userId)
-        : [...prev, userId]
+  const getAssignedUserIds = (taskData, availableUsers) => {
+    if (!taskData || !Array.isArray(taskData.assignedUsers)) {
+      return [];
+    }
+
+    const emailToId = new Map(
+      (availableUsers || []).map(user => [user.email, user.userId])
     );
+    const result = new Set();
+
+    taskData.assignedUsers.forEach((assignedUser) => {
+      if (!assignedUser) return;
+
+      if (typeof assignedUser === 'string') {
+        const mappedId = emailToId.get(assignedUser);
+        if (mappedId) {
+          result.add(mappedId);
+        }
+        return;
+      }
+
+      if (assignedUser.userId) {
+        result.add(assignedUser.userId);
+        return;
+      }
+
+      if (assignedUser.userEmail) {
+        const mappedId = emailToId.get(assignedUser.userEmail);
+        if (mappedId) {
+          result.add(mappedId);
+        }
+      }
+    });
+
+    return Array.from(result);
   };
+
+  const assignableUsers = users.filter(
+    user => user.role !== 'admin' && user.enabled !== false && user.status === 'CONFIRMED'
+  );
+  const assignedUserIdSet = new Set(getAssignedUserIds(task, users));
+  const newSelectionCount = selectedUsers.filter(userId => !assignedUserIdSet.has(userId)).length;
 
   const handleDelete = async () => {
     setShowDeleteConfirm(true);
@@ -255,9 +307,9 @@ const TaskDetail = () => {
     // Check if current user is assigned to this task
     return task.assignedUsers.some(assignedUser => {
       if (typeof assignedUser === 'string') {
-        return assignedUser === userId;
+        return assignedUser === userId || assignedUser === userEmail;
       }
-      return assignedUser.userId === userId;
+      return assignedUser.userId === userId || assignedUser.userEmail === userEmail;
     });
   };
 
@@ -468,34 +520,28 @@ const TaskDetail = () => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Assign Users to Task</h3>
-              <button className="modal-close" onClick={() => setShowAssignModal(false)}>×</button>
+              <button className="modal-close" onClick={() => setShowAssignModal(false)}>&times;</button>
             </div>
             <div className="modal-body">
               <p>Select users to assign to this task:</p>
-              <div className="users-selection-list">
-                {users.map(user => (
-                  <label key={user.userId} className="user-checkbox-item">
-                    <input
-                      type="checkbox"
-                      checked={selectedUsers.includes(user.userId)}
-                      onChange={() => toggleUserSelection(user.userId)}
-                    />
-                    <div className="user-avatar">{user.email?.substring(0, 2).toUpperCase() || '??'}</div>
-                    <div className="user-details">
-                      <div>{user.email}</div>
-                      <small>{user.name || 'No name'}</small>
-                    </div>
-                  </label>
-                ))}
-              </div>
+              {assignableUsers.length === 0 ? (
+                <div className="member-multiselect-empty">No members available for assignment.</div>
+              ) : (
+                <MultiMemberSelect
+                  users={assignableUsers}
+                  selectedUserIds={selectedUsers}
+                  onChange={setSelectedUsers}
+                  placeholder="Select one or more members"
+                />
+              )}
             </div>
             <div className="modal-footer">
               <button 
                 className="btn btn-primary" 
                 onClick={handleAssignUsers}
-                disabled={assigningUsers || selectedUsers.length === 0}
+                disabled={assigningUsers || newSelectionCount === 0}
               >
-                {assigningUsers ? 'Assigning...' : `Assign ${selectedUsers.length} User(s)`}
+                {assigningUsers ? 'Assigning...' : `Assign ${newSelectionCount} User(s)`}
               </button>
               <button 
                 className="btn btn-secondary" 
@@ -542,3 +588,4 @@ const TaskDetail = () => {
 };
 
 export default TaskDetail;
+

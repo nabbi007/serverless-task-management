@@ -9,7 +9,9 @@ const handlers = [
   'updateTask',
   'deleteTask',
   'assignTask',
-  'getUsers'
+  'getUsers',
+  'streamProcessor',
+  'emailFormatter'
 ];
 
 // Create dist directory

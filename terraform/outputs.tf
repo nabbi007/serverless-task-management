@@ -33,3 +33,13 @@ output "ses_from_email_identity_arn" {
   value       = length(aws_ses_email_identity.from) > 0 ? aws_ses_email_identity.from[0].arn : null
 }
 
+output "ses_domain_verification_token" {
+  description = "SES domain verification token (if domain identity is configured)"
+  value       = length(aws_ses_domain_identity.main) > 0 ? aws_ses_domain_identity.main[0].verification_token : null
+}
+
+output "ses_domain_dkim_tokens" {
+  description = "SES DKIM tokens to add to DNS (if domain identity is configured)"
+  value       = length(aws_ses_domain_dkim.main) > 0 ? aws_ses_domain_dkim.main[0].dkim_tokens : []
+}
+
