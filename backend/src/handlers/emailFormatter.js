@@ -1,7 +1,10 @@
+const { SNSClient, PublishCommand } = require('@aws-sdk/client-sns');
 const { getItem, query } = require('../utils/dynamodb');
 const { getUserEmail, listAdminUserIds, sendEmail } = require('../utils/notifications');
 const { validateEnvVars } = require('../utils/validation');
 const { createLogger } = require('../utils/logger');
+
+const snsClient = new SNSClient({});
 
 const formatTaskSummary = (task) => {
   const dueDate = task?.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date';
@@ -46,6 +49,66 @@ const getAdminEmails = async () => {
   return adminEmails.filter(Boolean);
 };
 
+const publishFallbackAlert = async (recipient, eventType, task, logger) => {
+  if (!recipient || !process.env.SNS_FALLBACK_TOPIC_ARN) {
+    return false;
+  }
+
+  const message =
+    `Task notification fallback\n` +
+    `Event: ${eventType}\n` +
+    `Task: ${task?.title || 'Task updated'}\n` +
+    `Please open the Task Management app to view full details.`;
+
+  await snsClient.send(
+    new PublishCommand({
+      TopicArn: process.env.SNS_FALLBACK_TOPIC_ARN,
+      Subject: 'Task Update Alert',
+      Message: message,
+      MessageAttributes: {
+        recipient: {
+          DataType: 'String',
+          StringValue: recipient
+        },
+        eventType: {
+          DataType: 'String',
+          StringValue: eventType
+        }
+      }
+    })
+  );
+
+  logger.info('Fallback SNS alert published', { recipient, eventType, taskId: task?.taskId });
+  return true;
+};
+
+const deliverWithFallback = async (recipient, subject, body, eventType, task, logger) => {
+  try {
+    await sendEmail(recipient, subject, body);
+    return 'ses';
+  } catch (sesError) {
+    logger.warn('SES delivery failed; trying SNS fallback', {
+      recipient,
+      eventType,
+      taskId: task?.taskId,
+      error: sesError.message
+    });
+
+    try {
+      const fallbackSent = await publishFallbackAlert(recipient, eventType, task, logger);
+      return fallbackSent ? 'sns' : 'failed';
+    } catch (snsError) {
+      logger.error('SNS fallback delivery failed', {
+        recipient,
+        eventType,
+        taskId: task?.taskId,
+        error: snsError.message
+      });
+      return 'failed';
+    }
+  }
+};
+
 const handleTaskAssigned = async (message, logger) => {
   const { taskId, assignmentId, assignedToEmail, assignedToUserId, assignedBy } = message;
 
@@ -86,11 +149,24 @@ const handleTaskAssigned = async (message, logger) => {
     `${assignedByEmail ? `Assigned by: ${assignedByEmail}\n` : ''}\n` +
     `${formatTaskSummary(task)}`;
 
+  const deliveryStats = { ses: 0, sns: 0, failed: 0 };
   for (const email of recipients) {
-    await sendEmail(email, subject, body);
+    const channel = await deliverWithFallback(
+      email,
+      subject,
+      body,
+      'TASK_ASSIGNED',
+      task,
+      logger
+    );
+    deliveryStats[channel] += 1;
   }
 
-  logger.info('Assignment notifications sent', { taskId, recipients: recipients.size });
+  logger.info('Assignment notifications processed', {
+    taskId,
+    recipients: recipients.size,
+    delivery: deliveryStats
+  });
 };
 
 const handleStatusChanged = async (message, logger) => {
@@ -115,7 +191,7 @@ const handleStatusChanged = async (message, logger) => {
     ...assignedEmails,
     ...fallbackAssigned,
     ...adminEmails
-  ]);
+  ].filter(Boolean));
 
   if (recipients.size === 0) {
     logger.info('No recipients for status change notification', { taskId });
@@ -128,11 +204,24 @@ const handleStatusChanged = async (message, logger) => {
     status: newStatus
   })}`;
 
+  const deliveryStats = { ses: 0, sns: 0, failed: 0 };
   for (const email of recipients) {
-    await sendEmail(email, subject, body);
+    const channel = await deliverWithFallback(
+      email,
+      subject,
+      body,
+      'TASK_STATUS_CHANGED',
+      task,
+      logger
+    );
+    deliveryStats[channel] += 1;
   }
 
-  logger.info('Status change notifications sent', { taskId, recipients: recipients.size });
+  logger.info('Status change notifications processed', {
+    taskId,
+    recipients: recipients.size,
+    delivery: deliveryStats
+  });
 };
 
 exports.handler = async (event) => {

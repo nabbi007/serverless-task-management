@@ -55,3 +55,9 @@ variable "sns_task_status_topic_arn" {
   description = "SNS topic ARN for task status change notifications"
   type        = string
 }
+
+variable "sns_fallback_topic_arn" {
+  description = "SNS topic ARN for generic fallback alerts"
+  type        = string
+  default     = ""
+}

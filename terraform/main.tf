@@ -64,7 +64,11 @@ module "iam" {
   assignments_table_arn  = module.dynamodb.assignments_table_arn
   tasks_stream_arn        = module.dynamodb.tasks_stream_arn
   assignments_stream_arn  = module.dynamodb.assignments_stream_arn
-  sns_topic_arns          = [aws_sns_topic.task_assigned.arn, aws_sns_topic.task_status_changed.arn]
+  sns_topic_arns          = [
+    aws_sns_topic.task_assigned.arn,
+    aws_sns_topic.task_status_changed.arn,
+    aws_sns_topic.task_fallback_alerts.arn
+  ]
 }
 
 # Lambda Functions

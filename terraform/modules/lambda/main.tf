@@ -248,6 +248,7 @@ resource "aws_lambda_function" "email_formatter" {
       ASSIGNMENTS_TABLE = var.assignments_table_name
       USER_POOL_ID      = var.cognito_user_pool_id
       SES_FROM_EMAIL    = var.ses_from_email
+      SNS_FALLBACK_TOPIC_ARN = var.sns_fallback_topic_arn
     }
   }
   

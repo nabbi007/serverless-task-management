@@ -6,6 +6,10 @@ resource "aws_sns_topic" "task_status_changed" {
   name = "${var.project_name}-${var.environment}-task-status-changed"
 }
 
+resource "aws_sns_topic" "task_fallback_alerts" {
+  name = "${var.project_name}-${var.environment}-task-fallback-alerts"
+}
+
 resource "aws_lambda_event_source_mapping" "assignments_stream" {
   event_source_arn  = module.dynamodb.assignments_stream_arn
   function_name     = module.lambda.function_arns.stream_processor
@@ -52,4 +56,17 @@ resource "aws_sns_topic_subscription" "task_status_changed_email_formatter" {
   endpoint  = module.lambda.function_arns.email_formatter
 
   depends_on = [aws_lambda_permission.allow_sns_task_status_changed]
+}
+
+# Optional direct email subscriptions for fallback generic alerts.
+# Filter policy ensures each subscriber only receives messages tagged with their own email.
+resource "aws_sns_topic_subscription" "task_fallback_direct_email" {
+  for_each  = toset(var.sns_email_subscribers)
+  topic_arn = aws_sns_topic.task_fallback_alerts.arn
+  protocol  = "email"
+  endpoint  = each.value
+
+  filter_policy = jsonencode({
+    recipient = [each.value]
+  })
 }

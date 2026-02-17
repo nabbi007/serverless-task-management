@@ -19,7 +19,7 @@ variable "project_name" {
 variable "allowed_email_domains" {
   description = "Allowed email domains for signup"
   type        = list(string)
-  default     = ["amalitech.com", "amalitechtraining.org", "gmail.com"]
+  default     = ["amalitech.com", "amalitechtraining.org"]
 }
 
 variable "cognito_callback_urls" {
@@ -50,5 +50,11 @@ variable "ses_domain" {
   description = "Domain identity to verify in SES (optional, for production-ready sending)"
   type        = string
   default     = ""
+}
+
+variable "sns_email_subscribers" {
+  description = "Email addresses to subscribe directly to SNS task notification topics"
+  type        = list(string)
+  default     = []
 }
 
