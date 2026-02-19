@@ -136,8 +136,3 @@ resource "aws_iam_role_policy" "lambda_cognito" {
   })
 }
 
-# X-Ray tracing policy (optional but recommended)
-resource "aws_iam_role_policy_attachment" "lambda_xray" {
-  role       = aws_iam_role.lambda_execution.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
-}

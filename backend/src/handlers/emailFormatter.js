@@ -49,6 +49,12 @@ const getAdminEmails = async () => {
   return adminEmails.filter(Boolean);
 };
 
+const getRecipientsFromValues = async (values = []) => {
+  const uniqueValues = [...new Set(values.filter(Boolean))];
+  const resolved = await Promise.all(uniqueValues.map((value) => resolveEmail(value)));
+  return [...new Set(resolved.filter(Boolean))];
+};
+
 const publishFallbackAlert = async (recipient, eventType, task, logger) => {
   if (!recipient || !process.env.SNS_FALLBACK_TOPIC_ARN) {
     return false;
@@ -224,6 +230,53 @@ const handleStatusChanged = async (message, logger) => {
   });
 };
 
+const handleTaskDeleted = async (message, logger) => {
+  const { taskId, title, description, assignedUsers = [], assignedTo, deletedAt } = message;
+
+  if (!taskId) {
+    logger.warn('Task delete notification missing taskId', { message });
+    return;
+  }
+
+  const recipients = await getRecipientsFromValues([
+    ...(Array.isArray(assignedUsers) ? assignedUsers : []),
+    assignedTo
+  ]);
+
+  if (recipients.length === 0) {
+    logger.info('No recipients for task delete notification', { taskId });
+    return;
+  }
+
+  const subject = `Task Deleted: ${title || 'Untitled'}`;
+  const deletedDate = deletedAt ? new Date(deletedAt).toLocaleString() : new Date().toLocaleString();
+  const body =
+    `A task assigned to you has been deleted.\n\n` +
+    `Task: ${title || 'Untitled'}\n` +
+    `Description: ${description || 'No description'}\n` +
+    `Deleted at: ${deletedDate}\n\n` +
+    `Open the app to view your current task list.`;
+
+  const deliveryStats = { ses: 0, sns: 0, failed: 0 };
+  for (const email of recipients) {
+    const channel = await deliverWithFallback(
+      email,
+      subject,
+      body,
+      'TASK_DELETED',
+      { taskId, title },
+      logger
+    );
+    deliveryStats[channel] += 1;
+  }
+
+  logger.info('Task delete notifications processed', {
+    taskId,
+    recipients: recipients.length,
+    delivery: deliveryStats
+  });
+};
+
 exports.handler = async (event) => {
   const startTime = Date.now();
   const logger = createLogger('email-formatter', event);
@@ -256,6 +309,11 @@ exports.handler = async (event) => {
 
       if (message.type === 'TASK_STATUS_CHANGED') {
         await handleStatusChanged(message, logger);
+        continue;
+      }
+
+      if (message.type === 'TASK_DELETED') {
+        await handleTaskDeleted(message, logger);
         continue;
       }
 

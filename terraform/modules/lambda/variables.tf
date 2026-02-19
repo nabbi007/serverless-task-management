@@ -34,12 +34,6 @@ variable "lambda_layer_arn" {
   default     = ""
 }
 
-variable "aws_region" {
-  description = "AWS region"
-  type        = string
-  default     = "eu-west-1"
-}
-
 variable "ses_from_email" {
   description = "Verified SES From email address used for notifications"
   type        = string
@@ -54,10 +48,4 @@ variable "sns_task_assigned_topic_arn" {
 variable "sns_task_status_topic_arn" {
   description = "SNS topic ARN for task status change notifications"
   type        = string
-}
-
-variable "sns_fallback_topic_arn" {
-  description = "SNS topic ARN for generic fallback alerts"
-  type        = string
-  default     = ""
 }

@@ -23,6 +23,7 @@ const TaskDetail = () => {
     title: '',
     message: '',
     variant: 'success',
+    icon: null,
     autoClose: true,
     autoCloseDelay: 1800,
     onClose: null,
@@ -107,6 +108,7 @@ const TaskDetail = () => {
       title: config.title || prev.title,
       message: config.message || '',
       variant: config.variant || 'success',
+      icon: config.icon || null,
       autoClose: config.autoClose ?? true,
       autoCloseDelay: config.autoCloseDelay ?? 1800,
       onClose: config.onClose || null,
@@ -181,6 +183,7 @@ const TaskDetail = () => {
         title: 'Task updated',
         message: 'Your changes have been saved.',
         variant: 'success',
+        icon: 'tasks',
         autoClose: true,
         autoCloseDelay: 1600
       });
@@ -562,6 +565,7 @@ const TaskDetail = () => {
         title={modalConfig.title}
         message={modalConfig.message}
         variant={modalConfig.variant}
+        icon={modalConfig.icon}
         autoClose={modalConfig.autoClose}
         autoCloseDelay={modalConfig.autoCloseDelay}
         primaryAction={modalConfig.primaryAction}

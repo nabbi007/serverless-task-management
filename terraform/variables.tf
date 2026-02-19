@@ -37,24 +37,11 @@ variable "cognito_logout_urls" {
 variable "ses_from_email" {
   description = "Verified SES From email address used for notifications"
   type        = string
-  default     = "illiasu.abubakar@amalitech.com"
+  default     = "nabbiilliasu@gmail.com"
 }
 
 variable "ses_verified_recipient_emails" {
   description = "Recipient emails to verify in SES (needed for sandbox sending)"
   type        = list(string)
-  default     = ["illiasu.abubakar@amalitech.com"]
+  default     = ["nabbiilliasu@gmail.com"]
 }
-
-variable "ses_domain" {
-  description = "Domain identity to verify in SES (optional, for production-ready sending)"
-  type        = string
-  default     = ""
-}
-
-variable "sns_email_subscribers" {
-  description = "Email addresses to subscribe directly to SNS task notification topics"
-  type        = list(string)
-  default     = []
-}
-

@@ -6,6 +6,7 @@ const snsClient = new SNSClient({});
 
 const TASK_ASSIGNED = 'TASK_ASSIGNED';
 const TASK_STATUS_CHANGED = 'TASK_STATUS_CHANGED';
+const TASK_DELETED = 'TASK_DELETED';
 
 const getTableNameFromArn = (arn = '') => {
   const match = arn.match(/table\/([^/]+)/);
@@ -17,6 +18,41 @@ const getString = (image, key) => {
     return null;
   }
   return image[key].S || null;
+};
+
+const getStringList = (image, key) => {
+  if (!image || !image[key]) {
+    return [];
+  }
+
+  const value = image[key];
+
+  if (Array.isArray(value.L)) {
+    return value.L
+      .map((entry) => {
+        if (entry?.S) {
+          return entry.S;
+        }
+        if (entry?.M?.userEmail?.S) {
+          return entry.M.userEmail.S;
+        }
+        if (entry?.M?.userId?.S) {
+          return entry.M.userId.S;
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }
+
+  if (Array.isArray(value.SS)) {
+    return value.SS.filter(Boolean);
+  }
+
+  if (value.S) {
+    return [value.S];
+  }
+
+  return [];
 };
 
 exports.handler = async (event) => {
@@ -101,6 +137,38 @@ exports.handler = async (event) => {
             logger.warn('Status change record missing taskId', { message });
             continue;
           }
+
+          publishPromises.push(
+            snsClient.send(
+              new PublishCommand({
+                TopicArn: taskStatusTopicArn,
+                Message: JSON.stringify(message)
+              })
+            )
+          );
+        }
+
+        if (tableName === tasksTableName && eventName === 'REMOVE') {
+          const oldImage = record.dynamodb?.OldImage;
+          const taskId = getString(oldImage, 'taskId');
+
+          if (!taskId) {
+            logger.warn('Task delete record missing taskId');
+            continue;
+          }
+
+          const assignedUsers = getStringList(oldImage, 'assignedUsers');
+          const assignedTo = getString(oldImage, 'assignedTo');
+
+          const message = {
+            type: TASK_DELETED,
+            taskId,
+            title: getString(oldImage, 'title'),
+            description: getString(oldImage, 'description'),
+            assignedTo,
+            assignedUsers,
+            deletedAt: new Date().toISOString()
+          };
 
           publishPromises.push(
             snsClient.send(

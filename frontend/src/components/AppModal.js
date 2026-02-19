@@ -1,5 +1,13 @@
 import React, { useEffect } from 'react';
-import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Info,
+  LayoutDashboard,
+  ListTodo,
+  Users,
+  X
+} from 'lucide-react';
 
 const ICONS = {
   success: CheckCircle2,
@@ -7,11 +15,19 @@ const ICONS = {
   info: Info
 };
 
+const CUSTOM_ICONS = {
+  tasks: ListTodo,
+  team: Users,
+  dashboard: LayoutDashboard,
+  update: ListTodo
+};
+
 const AppModal = ({
   open,
   title,
   message,
   variant = 'success',
+  icon,
   onClose,
   primaryAction,
   secondaryAction,
@@ -29,7 +45,8 @@ const AppModal = ({
 
   if (!open) return null;
 
-  const Icon = ICONS[variant] || Info;
+  const customIcon = typeof icon === 'string' ? CUSTOM_ICONS[icon] : icon;
+  const Icon = customIcon || ICONS[variant] || Info;
   const hasActions = Boolean(primaryAction || secondaryAction);
 
   const handlePrimary = () => {

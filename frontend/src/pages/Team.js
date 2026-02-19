@@ -52,8 +52,15 @@ const Team = () => {
     return colors[status] || '#95a5a6';
   };
 
+  const normalizeRole = (role) => {
+    const normalized = String(role || 'member').toLowerCase();
+    return normalized === 'admin' ? 'Admin' : 'Member';
+  };
+
   const getRoleBadgeClass = (role) => {
-    return role === 'Admin' ? 'role-badge role-admin' : 'role-badge role-member';
+    return normalizeRole(role) === 'Admin'
+      ? 'role-badge role-admin'
+      : 'role-badge role-member';
   };
 
   if (loading) {
@@ -109,7 +116,7 @@ const Team = () => {
                 <p className="member-email">{user.userId}</p>
                 <div className="member-meta">
                   <span className={getRoleBadgeClass(user.role)}>
-                    {user.role || 'Member'}
+                    {normalizeRole(user.role)}
                   </span>
                   <span 
                     className="member-status-badge"

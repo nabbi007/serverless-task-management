@@ -1,15 +1,5 @@
 data "aws_region" "current" {}
 
-# Dead Letter Queue for failed Lambda invocations
-resource "aws_sqs_queue" "lambda_dlq" {
-  name                      = "${var.project_name}-${var.environment}-lambda-dlq"
-  message_retention_seconds = 1209600 # 14 days
-  
-  tags = {
-    Name        = "${var.project_name}-${var.environment}-lambda-dlq"
-    Environment = var.environment
-  }
-}
 
 # SNS Topic for CloudWatch Alarms (optional)
 resource "aws_sns_topic" "alerts" {

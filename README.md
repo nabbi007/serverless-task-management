@@ -1,4 +1,4 @@
-# Serverless Task Management System
+﻿# Serverless Task Management System
 
 Serverless task management platform built on AWS with:
 - Cognito authentication and role-based access control (Admin/Member)
@@ -26,18 +26,21 @@ Notifications:
 - `stream-processor` publishes to SNS topics:
   - task assigned
   - task status changed
+  - task deleted
 - `email-formatter` consumes SNS and sends email through SES
-- Optional direct SNS email subscriptions are supported as fallback
 
 Auth and Security:
 - Cognito User Pool + User Pool Client + Hosted UI domain
 - PreSignUp Lambda domain restriction
 - Roles/groups (`admin`, `member`)
 - IAM least privilege policies
-- CloudWatch Logs + X-Ray tracing
+- CloudWatch Logs 
 
-Diagram file:
-- `architecture.drawio`
+
+
+## Architecture Diagram
+
+![High-Level Architecture](docs/architecture-overview.png)
 
 ## Core Business Rules
 
@@ -50,6 +53,7 @@ Diagram file:
 - Notifications:
   - On assignment: assigned member(s) and admin recipients
   - On status change: assigned member(s) and admins
+  - On task delete: assigned member(s)
 
 ## Repository Structure
 
@@ -77,8 +81,10 @@ Diagram file:
 |   |-- outputs.tf
 |   `-- terraform.tfvars
 |-- amplify.yml
-|-- build-lambdas.sh
-`-- architecture.drawio
+|-- architecture.drawio
+|-- docs/
+|   `-- architecture-overview.png
+`-- build-lambdas.sh
 ```
 
 ## Prerequisites
@@ -102,7 +108,6 @@ npm install
 REACT_APP_API_ENDPOINT=<api_gateway_endpoint>
 REACT_APP_USER_POOL_ID=<cognito_user_pool_id>
 REACT_APP_USER_POOL_CLIENT_ID=<cognito_user_pool_client_id>
-REACT_APP_COGNITO_DOMAIN=<cognito_hosted_ui_domain>
 REACT_APP_AWS_REGION=eu-west-1
 ```
 
@@ -146,30 +151,23 @@ Set these Amplify environment variables:
 - `REACT_APP_API_ENDPOINT`
 - `REACT_APP_USER_POOL_ID`
 - `REACT_APP_USER_POOL_CLIENT_ID`
-- `REACT_APP_COGNITO_DOMAIN`
 - `REACT_APP_AWS_REGION`
 
 `amplify.yml` writes them into `.env.production` during build.
 
-## Notifications Setup Notes
-
-Primary path:
-- SES email via `email-formatter` Lambda
-
-Fallback path:
-- Generic SNS fallback alerts via `sns_email_subscribers` in `terraform.tfvars`
-- Each subscriber is attached to a fallback topic with filter policy on `recipient`
-- `email-formatter` publishes fallback alert to SNS only when SES delivery fails
-
-Example:
+For Cognito app client redirects in production, set your Amplify URL in Terraform:
 ```hcl
-sns_email_subscribers = [
-  "illiasu.abubakar@amalitech.com",
-  "abraham.gyamfi@amalitech.com"
-]
+cognito_callback_urls = ["https://<your-amplify-domain>/"]
+cognito_logout_urls   = ["https://<your-amplify-domain>/"]
 ```
 
-After `terraform apply`, each subscriber must confirm SNS subscription by email.
+## Notifications Setup Notes
+
+- SES email is the notification channel via `email-formatter` Lambda.
+- Triggered events:
+  - `TASK_ASSIGNED`
+  - `TASK_STATUS_CHANGED`
+  - `TASK_DELETED`
 
 ## SES Important Notes
 
@@ -185,7 +183,6 @@ No email received:
   - `/aws/lambda/<project>-<env>-stream-processor`
   - `/aws/lambda/<project>-<env>-email-formatter`
 - Confirm SES sender/recipient identity status.
-- Confirm SNS subscription status is `Confirmed` (for direct SNS email fallback).
 
 Auth errors:
 - Verify frontend env vars match current Terraform outputs.
@@ -206,4 +203,6 @@ Task visibility issues:
 
 - Move all Lambdas and layer to Node.js 20 runtime.
 - Add CI checks (lint/tests/terraform validate) on pull requests.
-- Add domain-level SES DKIM/SPF/DMARC alignment for better deliverability.
+- Add SES deliverability hardening (SPF/DMARC and, if domain access is available, domain identity + DKIM).
+
+

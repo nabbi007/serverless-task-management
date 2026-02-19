@@ -1592,26 +1592,35 @@ body {
 }
 
 .app-modal-icon {
-  width: 68px;
-  height: 68px;
+  width: 56px;
+  height: 56px;
   margin: 0 auto 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16px;
-  color: white;
-  background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
-  box-shadow: 0 16px 30px rgba(14, 116, 144, 0.2);
+  border-radius: 14px;
+  color: #334155;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
 }
 
 .app-modal-icon-success {
-  background: linear-gradient(135deg, #16a34a 0%, #0f766e 100%);
-  box-shadow: 0 16px 30px rgba(22, 163, 74, 0.25);
+  background: #ecfdf3;
+  border-color: #bbf7d0;
+  color: #166534;
 }
 
 .app-modal-icon-danger {
-  background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
-  box-shadow: 0 16px 30px rgba(239, 68, 68, 0.25);
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.app-modal-icon-info {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
 }
 
 .app-modal-title {

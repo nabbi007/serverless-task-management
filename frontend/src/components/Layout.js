@@ -17,6 +17,8 @@ const Layout = ({ children, signOut, user }) => {
     return location.pathname === path;
   };
 
+  const formatRoleLabel = (role) => (role === 'admin' ? 'Admin' : 'Member');
+
   return (
     <div className="app-wrapper">
       {/* Top Header */}
@@ -75,7 +77,7 @@ const Layout = ({ children, signOut, user }) => {
               <div className="user-avatar-small">{getInitials(user?.signInDetails?.loginId)}</div>
               <div className="user-details">
                 <div className="user-email">{user?.signInDetails?.loginId}</div>
-                <div className="user-role">{userRole}</div>
+                <div className="user-role">{formatRoleLabel(userRole)}</div>
               </div>
               <LogOut size={16} className="signout-icon-inline" />
             </button>

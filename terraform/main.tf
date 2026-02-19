@@ -66,8 +66,7 @@ module "iam" {
   assignments_stream_arn  = module.dynamodb.assignments_stream_arn
   sns_topic_arns          = [
     aws_sns_topic.task_assigned.arn,
-    aws_sns_topic.task_status_changed.arn,
-    aws_sns_topic.task_fallback_alerts.arn
+    aws_sns_topic.task_status_changed.arn
   ]
 }
 
@@ -82,7 +81,6 @@ module "lambda" {
   assignments_table_name    = module.dynamodb.assignments_table_name
   cognito_user_pool_id      = module.cognito.user_pool_id
   lambda_layer_arn          = module.lambda_layer.layer_arn
-  aws_region                = var.aws_region
   ses_from_email            = var.ses_from_email
   sns_task_assigned_topic_arn = aws_sns_topic.task_assigned.arn
   sns_task_status_topic_arn   = aws_sns_topic.task_status_changed.arn
