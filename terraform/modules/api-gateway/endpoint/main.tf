@@ -1,6 +1,3 @@
-# Get current AWS account ID
-data "aws_caller_identity" "current" {}
-
 # Method
 resource "aws_api_gateway_method" "main" {
   rest_api_id   = var.rest_api_id
